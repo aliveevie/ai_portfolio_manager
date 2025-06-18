@@ -4,6 +4,7 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { Chat } from "@/components/Chat";
 import { useAccount } from "wagmi";
 import { useState } from "react";
+import { ChatWidget } from "@/components/ChatWidget";
 
 const mockPortfolio = {
   total: 126082.5,
@@ -94,7 +95,8 @@ export const Dashboard = () => {
               <span className="flex items-center gap-2 text-green-400 text-xs"><span className="w-2 h-2 bg-green-400 rounded-full"></span>Live</span>
             </div>
           </div>
-          {isConnected && <div className="mt-6"><Chat /></div>}
+          {/* Remove Chat from Portfolio Overview */}
+          {/* {isConnected && <div className="mt-6"><Chat /></div>} */}
         </section>
         {/* AI Recommendations */}
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col gap-4">
@@ -213,6 +215,7 @@ export const Dashboard = () => {
           <button className="mt-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded px-4 py-2 text-xs">View More News</button>
         </section>
       </div>
+      <ChatWidget />
     </div>
   );
 }; 
