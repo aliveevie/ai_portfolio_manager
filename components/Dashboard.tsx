@@ -53,7 +53,7 @@ export const Dashboard = () => {
     const totalValue = portfolioData.total;
     if (totalValue === 0) return mockAllocation;
     
-    const allocation = [];
+    const allocation: { label: string; value: number; color: string; }[] = [];
     Object.keys(portfolioData.balances).forEach(network => {
       const balance = portfolioData.balances[network];
       const price = portfolioData.prices[network] || 0;
