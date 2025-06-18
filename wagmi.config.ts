@@ -1,6 +1,6 @@
 import { createPublicClient } from "viem";
 import { createConfig, http, cookieStorage, createStorage } from "wagmi";
-import { lineaSepolia, sepolia } from "wagmi/chains";
+import { lineaSepolia, sepolia, arbitrumSepolia, optimismSepolia } from "wagmi/chains";
 import { metaMask } from "wagmi/connectors";
 
 export const publicClient = createPublicClient({
@@ -10,7 +10,7 @@ export const publicClient = createPublicClient({
 
 export function getConfig() {
   return createConfig({
-    chains: [lineaSepolia, sepolia],
+    chains: [lineaSepolia, sepolia, arbitrumSepolia, optimismSepolia],
     connectors: [metaMask()],
     ssr: true,
     storage: createStorage({
@@ -19,6 +19,8 @@ export function getConfig() {
     transports: {
       [lineaSepolia.id]: http(),
       [sepolia.id]: http(),
+      [arbitrumSepolia.id]: http(),
+      [optimismSepolia.id]: http(),
     },
   });
 }
