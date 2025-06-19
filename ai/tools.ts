@@ -299,7 +299,8 @@ const crossChainTransferTool = createTool({
       // Validate all required parameters
       if (!sourceChain || !destinationChain || !amount || !recipientAddress) {
         return { 
-          error: `Missing required parameters. Received: sourceChain=${sourceChain}, destinationChain=${destinationChain}, amount=${amount}, recipientAddress=${recipientAddress}` 
+          error: `Missing required parameters. Received: sourceChain=${sourceChain}, destinationChain=${destinationChain}, amount=${amount}, recipientAddress=${recipientAddress}`,
+          help: "Please provide all required parameters: sourceChain, destinationChain, amount, and recipientAddress"
         };
       }
 
@@ -463,10 +464,137 @@ const crossChainTransferTool = createTool({
   },
 });
 
+// Individual CCTP tools for step-by-step operations
+const approveUSDCTool = createTool({
+  description: "Approve USDC spending for cross-chain transfers",
+  parameters: z.object({
+    sourceChain: z.enum(["sepolia", "lineaSepolia", "arbitrumSepolia", "optimismSepolia"]).describe("The source chain"),
+    amount: z.string().describe("The amount of USDC to approve"),
+    walletAddress: z.string().describe("The wallet address to approve from"),
+  }),
+  execute: async ({ sourceChain, amount, walletAddress }) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/circle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve",
+          sourceChain,
+          amount,
+          walletAddress,
+        }),
+      });
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return { error: `Approval failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+    }
+  },
+});
+
+const depositForBurnTool = createTool({
+  description: "Burn USDC on source chain for cross-chain transfer",
+  parameters: z.object({
+    sourceChain: z.enum(["sepolia", "lineaSepolia", "arbitrumSepolia", "optimismSepolia"]).describe("The source chain"),
+    destinationChain: z.enum(["sepolia", "lineaSepolia", "arbitrumSepolia", "optimismSepolia"]).describe("The destination chain"),
+    amount: z.string().describe("The amount of USDC to burn"),
+    recipientAddress: z.string().describe("The recipient address on destination chain"),
+    walletAddress: z.string().describe("The sender wallet address"),
+  }),
+  execute: async ({ sourceChain, destinationChain, amount, recipientAddress, walletAddress }) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/circle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "depositForBurn",
+          sourceChain,
+          destinationChain,
+          amount,
+          recipientAddress,
+          walletAddress,
+        }),
+      });
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return { error: `DepositForBurn failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+    }
+  },
+});
+
+const getAttestationTool = createTool({
+  description: "Get attestation for a cross-chain transfer message",
+  parameters: z.object({
+    messageHash: z.string().describe("The message hash from the depositForBurn transaction"),
+  }),
+  execute: async ({ messageHash }) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/circle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "getAttestation",
+          messageHash,
+        }),
+      });
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return { error: `Attestation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+    }
+  },
+});
+
+const receiveMessageTool = createTool({
+  description: "Mint USDC on destination chain using message and attestation",
+  parameters: z.object({
+    destinationChain: z.enum(["sepolia", "lineaSepolia", "arbitrumSepolia", "optimismSepolia"]).describe("The destination chain"),
+    messageBytes: z.string().describe("The message bytes from attestation"),
+    attestation: z.string().describe("The attestation signature"),
+    walletAddress: z.string().describe("The recipient wallet address"),
+  }),
+  execute: async ({ destinationChain, messageBytes, attestation, walletAddress }) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/circle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "receiveMessage",
+          destinationChain,
+          messageBytes,
+          attestation,
+          walletAddress,
+        }),
+      });
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return { error: `ReceiveMessage failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+    }
+  },
+});
+
 export const tools = {
      displayBalance: balanceTool,
      multiNetworkBalance: multiNetworkBalanceTool,
      tokenBalance: tokenBalanceTool,
      sendTransaction: sendTransactionTool,
      crossChainTransfer: crossChainTransferTool,
+     approveUSDC: approveUSDCTool,
+     depositForBurn: depositForBurnTool,
+     getAttestation: getAttestationTool,
+     receiveMessage: receiveMessageTool,
 };

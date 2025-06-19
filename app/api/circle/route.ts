@@ -138,6 +138,34 @@ async function handleApprove(sourceChain: string, amount: string, walletAddress:
       return NextResponse.json({ error: 'Unsupported source chain' }, { status: 400 });
     }
 
+    // Handle undefined wallet address
+    if (!walletAddress) {
+      return NextResponse.json({
+        success: true,
+        message: 'Wallet address required for approval. Please provide a valid wallet address.',
+        requiredParameters: {
+          walletAddress: 'A valid Ethereum address (0x...)',
+          sourceChain,
+          amount,
+        },
+        example: {
+          action: 'approve',
+          sourceChain: 'sepolia',
+          amount: '2',
+          walletAddress: '0x1234567890123456789012345678901234567890'
+        }
+      });
+    }
+
+    // Validate wallet address format
+    if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return NextResponse.json({
+        error: 'Invalid wallet address format',
+        details: 'Wallet address must be a valid Ethereum address (0x followed by 40 hex characters)',
+        received: walletAddress
+      }, { status: 400 });
+    }
+
     // Format amount to USDC smallest units (6 decimals)
     const amountInSmallestUnits = Math.floor(parseFloat(amount) * 1000000).toString();
     
@@ -166,6 +194,12 @@ async function handleApprove(sourceChain: string, amount: string, walletAddress:
       requiredAmount: amountInSmallestUnits,
       spender: contracts.tokenMessenger,
       token: contracts.usdc,
+      transactionData: {
+        to: contracts.usdc,
+        data: '0x', // This would be the encoded approve function call
+        value: '0x0',
+        from: walletAddress,
+      },
     });
   } catch (error) {
     console.error('Approve error:', error);
@@ -186,6 +220,35 @@ async function handleDepositForBurn(
   try {
     console.log('Handling depositForBurn:', { sourceChain, destinationChain, amount, recipientAddress, walletAddress });
     
+    // Validate required parameters
+    if (!sourceChain || !destinationChain || !amount || !recipientAddress || !walletAddress) {
+      return NextResponse.json({
+        error: 'Missing required parameters for depositForBurn',
+        requiredParameters: {
+          sourceChain: 'sepolia | lineaSepolia | arbitrumSepolia | optimismSepolia',
+          destinationChain: 'sepolia | lineaSepolia | arbitrumSepolia | optimismSepolia',
+          amount: 'USDC amount (e.g., "2")',
+          recipientAddress: 'Destination wallet address (0x...)',
+          walletAddress: 'Sender wallet address (0x...)',
+        },
+        received: {
+          sourceChain,
+          destinationChain,
+          amount,
+          recipientAddress,
+          walletAddress,
+        },
+        example: {
+          action: 'depositForBurn',
+          sourceChain: 'sepolia',
+          destinationChain: 'arbitrumSepolia',
+          amount: '2',
+          recipientAddress: '0x1234567890123456789012345678901234567890',
+          walletAddress: '0x1234567890123456789012345678901234567890'
+        }
+      }, { status: 400 });
+    }
+    
     const sourceChainId = getChainIdFromName(sourceChain);
     const destinationDomain = CCTP_DOMAINS[getChainIdFromName(destinationChain)];
     const contracts = CCTP_CONTRACTS[sourceChainId];
@@ -193,6 +256,24 @@ async function handleDepositForBurn(
     
     if (!contracts || !client || destinationDomain === undefined) {
       return NextResponse.json({ error: 'Unsupported chain configuration' }, { status: 400 });
+    }
+
+    // Validate wallet address format
+    if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return NextResponse.json({
+        error: 'Invalid wallet address format',
+        details: 'Wallet address must be a valid Ethereum address (0x followed by 40 hex characters)',
+        received: walletAddress
+      }, { status: 400 });
+    }
+
+    // Validate recipient address format
+    if (!recipientAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return NextResponse.json({
+        error: 'Invalid recipient address format',
+        details: 'Recipient address must be a valid Ethereum address (0x followed by 40 hex characters)',
+        received: recipientAddress
+      }, { status: 400 });
     }
 
     const amountInSmallestUnits = Math.floor(parseFloat(amount) * 1000000).toString();
