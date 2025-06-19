@@ -290,41 +290,96 @@ const crossChainTransferTool = createTool({
   parameters: z.object({
     sourceChain: z.enum(["sepolia", "lineaSepolia", "arbitrumSepolia", "optimismSepolia"]).describe("The source chain for the transfer"),
     destinationChain: z.enum(["sepolia", "lineaSepolia", "arbitrumSepolia", "optimismSepolia"]).describe("The destination chain for the transfer"),
-    amount: z.string().describe("The amount of USDC to transfer (in the smallest unit, e.g., 6 decimals)"),
+    amount: z.string().describe("The amount of USDC to transfer (e.g., '2' for 2 USDC)"),
     recipientAddress: z.string().describe("The recipient wallet address on the destination chain"),
+    walletAddress: z.string().optional().describe("The sender wallet address (if not provided, will use connected wallet)"),
   }),
-  execute: async ({ sourceChain, destinationChain, amount, recipientAddress }) => {
+  execute: async ({ sourceChain, destinationChain, amount, recipientAddress, walletAddress }) => {
     try {
+      // Validate all required parameters
+      if (!sourceChain || !destinationChain || !amount || !recipientAddress) {
+        return { 
+          error: `Missing required parameters. Received: sourceChain=${sourceChain}, destinationChain=${destinationChain}, amount=${amount}, recipientAddress=${recipientAddress}` 
+        };
+      }
+
+      // Validate USDC amount
+      const usdcAmount = parseFloat(amount);
+      if (isNaN(usdcAmount) || usdcAmount <= 0) {
+        return { error: `Invalid amount: ${amount}. Please provide a positive number.` };
+      }
+
+      // Validate recipient address format
+      if (!recipientAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+        return { error: `Invalid recipient address format: ${recipientAddress}` };
+      }
+
+      // Get the base URL for API calls
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      
+      console.log(`Starting cross-chain transfer: ${amount} USDC from ${sourceChain} to ${destinationChain}`);
+      console.log(`Recipient: ${recipientAddress}`);
+      console.log(`Wallet: ${walletAddress || 'Connected wallet'}`);
+
       // Step 1: Approve USDC for TokenMessenger
-      const approveRes = await fetch("/api/circle", {
+      console.log('Step 1: Approving USDC...');
+      const approveRes = await fetch(`${baseUrl}/api/circle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "approve",
           sourceChain,
           amount,
+          walletAddress,
         }),
       });
+      
+      if (!approveRes.ok) {
+        const errorText = await approveRes.text();
+        console.error('Approve failed:', approveRes.status, errorText);
+        return { error: `Approval failed: ${approveRes.status} - ${errorText}` };
+      }
+      
       const approveData = await approveRes.json();
-      if (!approveData.success) return { error: approveData.error || "Approval failed" };
+      if (!approveData.success) {
+        console.error('Approve response error:', approveData);
+        return { error: approveData.error || "Approval failed" };
+      }
+      
+      console.log('Approval successful:', approveData.message);
 
       // Step 2: Burn USDC (depositForBurn)
-      const burnRes = await fetch("/api/circle", {
+      console.log('Step 2: Burning USDC...');
+      const burnRes = await fetch(`${baseUrl}/api/circle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "burn",
+          action: "depositForBurn",
           sourceChain,
           destinationChain,
           amount,
           recipientAddress,
+          walletAddress,
         }),
       });
+      
+      if (!burnRes.ok) {
+        const errorText = await burnRes.text();
+        console.error('Burn failed:', burnRes.status, errorText);
+        return { error: `Burn failed: ${burnRes.status} - ${errorText}` };
+      }
+      
       const burnData = await burnRes.json();
-      if (!burnData.success) return { error: burnData.error || "Burn failed" };
+      if (!burnData.success) {
+        console.error('Burn response error:', burnData);
+        return { error: burnData.error || "Burn failed" };
+      }
+      
+      console.log('Burn successful:', burnData.messageHash);
 
-      // Step 3: Get Attestation (simulate polling)
-      const attestationRes = await fetch("/api/circle", {
+      // Step 3: Get Attestation (polling)
+      console.log('Step 3: Getting attestation...');
+      const attestationRes = await fetch(`${baseUrl}/api/circle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -332,31 +387,78 @@ const crossChainTransferTool = createTool({
           messageHash: burnData.messageHash,
         }),
       });
+      
+      if (!attestationRes.ok) {
+        const errorText = await attestationRes.text();
+        console.error('Attestation failed:', attestationRes.status, errorText);
+        return { error: `Attestation failed: ${attestationRes.status} - ${errorText}` };
+      }
+      
       const attestationData = await attestationRes.json();
-      if (!attestationData.success) return { error: attestationData.error || "Attestation failed" };
+      if (!attestationData.success) {
+        console.error('Attestation response error:', attestationData);
+        return { error: attestationData.error || "Attestation failed" };
+      }
+      
+      console.log('Attestation successful');
 
       // Step 4: Mint USDC on destination chain
-      const mintRes = await fetch("/api/circle", {
+      console.log('Step 4: Minting USDC...');
+      const mintRes = await fetch(`${baseUrl}/api/circle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "mint",
+          action: "receiveMessage",
           destinationChain,
-          message: attestationData.messageBytes,
+          messageBytes: attestationData.messageBytes || '0x',
           attestation: attestationData.attestation,
+          walletAddress,
         }),
       });
+      
+      if (!mintRes.ok) {
+        const errorText = await mintRes.text();
+        console.error('Mint failed:', mintRes.status, errorText);
+        return { error: `Mint failed: ${mintRes.status} - ${errorText}` };
+      }
+      
       const mintData = await mintRes.json();
-      if (!mintData.success) return { error: mintData.error || "Mint failed" };
+      if (!mintData.success) {
+        console.error('Mint response error:', mintData);
+        return { error: mintData.error || "Mint failed" };
+      }
+      
+      console.log('Mint successful');
 
       return {
-        approveTx: approveData.transactionId,
-        burnTx: burnData.transactionId,
-        mintTx: mintData.transactionId,
-        message: "Cross-chain transfer initiated. Track transaction hashes for status.",
+        success: true,
+        message: `Cross-chain transfer completed successfully! ${amount} USDC transferred from ${sourceChain} to ${destinationChain}.`,
+        details: {
+          sourceChain,
+          destinationChain,
+          amount,
+          recipientAddress,
+          messageHash: burnData.messageHash,
+          attestation: attestationData.attestation,
+          steps: {
+            approval: 'Completed',
+            burn: 'Completed', 
+            attestation: 'Completed',
+            mint: 'Completed',
+          },
+        },
+        instructions: {
+          approval: approveData.message,
+          burn: burnData.message,
+          attestation: 'Attestation received from Circle',
+          mint: mintData.message,
+        },
       };
     } catch (error) {
-      return { error: "Cross-chain transfer failed: " + (error as any)?.message };
+      console.error("Cross-chain transfer error:", error);
+      return { 
+        error: `Cross-chain transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
     }
   },
 });
