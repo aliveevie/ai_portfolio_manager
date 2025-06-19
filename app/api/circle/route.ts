@@ -46,7 +46,8 @@ function getCircleClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { action, sourceChain, destinationChain, amount, recipientAddress, walletId } = await request.json();
+    const body = await request.json();
+    const { action, sourceChain, destinationChain, amount, recipientAddress, walletId, messageHash, message, attestation } = body;
 
     if (!process.env.CIRCLE_WALLET_API_KEY) {
       return NextResponse.json({ error: 'Circle API key not configured' }, { status: 500 });
@@ -67,9 +68,9 @@ export async function POST(request: NextRequest) {
       case 'burn':
         return await handleBurn(client, sourceChain, destinationChain, amount, recipientAddress, walletIdToUse);
       case 'getAttestation':
-        return await handleGetAttestation(request.body?.messageHash);
+        return await handleGetAttestation(messageHash);
       case 'mint':
-        return await handleMint(client, destinationChain, request.body?.message, request.body?.attestation, walletIdToUse);
+        return await handleMint(client, destinationChain, message, attestation, walletIdToUse);
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
