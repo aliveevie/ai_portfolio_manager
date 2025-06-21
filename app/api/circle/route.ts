@@ -132,7 +132,7 @@ function getChainIdFromName(chainName: string): number {
 
 // Utility to convert address to bytes32
 function addressToBytes32(address: string): `0x${string}` {
-  return pad(toHex(address), { size: 32 });
+  return pad(address as `0x${string}`, { size: 32 });
 }
 
 async function handleApprove(sourceChain: string, amount: string, walletAddress: string) {
