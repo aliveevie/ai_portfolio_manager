@@ -22,7 +22,7 @@ export const ChatWidget = () => {
   const { address, isConnected } = useAccount();
   const { sendTransaction } = useSendTransaction();
   
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat({
     initialMessages: [
       {
         role: "system",
@@ -40,11 +40,9 @@ export const ChatWidget = () => {
 
   useEffect(() => {
     if (receipt && pendingTx) {
-      toast.success(`Transaction ${pendingTx.hash.slice(0, 10)}... confirmed!`);
-
       if (pendingTx.toolName === 'depositForBurn') {
         const messageSentLog = receipt.logs.find(
-          (log: any) => log.topics[0] === keccak256('MessageSent(bytes)')
+          (log: any) => log.topics[0] === keccak256(toHex('MessageSent(bytes)'))
         );
 
         if (messageSentLog) {
@@ -57,27 +55,47 @@ export const ChatWidget = () => {
           const message = (decodedLog.args as any).message;
           const messageHash = keccak256(message);
 
-          const newMessage = {
-            id: `user-get-attestation-${messageHash}`,
-            role: 'user' as const,
-            content: `The burn transaction was successful. Please get the attestation for the message hash: ${messageHash}`,
-          };
+          append({
+            role: 'user',
+            content: `The burn transaction was successful. Get the attestation for message hash: ${messageHash}`,
+          });
           
-          setMessages([...messages, newMessage]);
-          toast.success("Burn successful! Now getting attestation...");
+          toast.success("Burn successful! Fetching attestation...");
         } else {
-          toast.error("Could not find MessageSent event in transaction logs.");
+          toast.error("Could not find MessageSent event in the transaction logs.");
         }
+      } else {
+        toast.success(`Transaction ${pendingTx.hash.slice(0, 10)}... confirmed!`);
       }
       setPendingTx(null);
     }
-  }, [receipt, pendingTx, setMessages, messages]);
+  }, [receipt, pendingTx, append]);
 
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleSignTransaction = (toolName: string, transactionData: any) => {
+    sendTransaction({
+      to: transactionData.to,
+      data: transactionData.data,
+      value: BigInt(transactionData.value)
+    }, {
+      onSuccess: (hash) => {
+        toast.loading(`Transaction sent: ${hash.slice(0, 10)}... Waiting for confirmation.`);
+        if (toolName === 'depositForBurn') {
+          setPendingTx({ hash, toolName });
+        } else {
+          toast.success(`Transaction confirmed: ${hash.slice(0, 10)}...`);
+        }
+      },
+      onError: (error) => {
+        toast.error(`Transaction failed: ${error.message}`);
+      }
+    });
+  };
 
   return (
     <>
@@ -136,25 +154,10 @@ export const ChatWidget = () => {
                       )}
                       <div>
                         <p className="text-sm break-words">{message.content}</p>
-                        {/* Tool results (e.g., balance) */}
+                        {/* Tool results */}
                         {Array.isArray(message.toolInvocations) && message.toolInvocations.map((toolInvocation) => {
                           const { toolName, toolCallId, state } = toolInvocation;
-                          if (state === "result" && toolName === "displayBalance") {
-                            const result = (toolInvocation as any).result;
-                            return (
-                              <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
-                                Balance: {result?.balance} ETH
-                              </div>
-                            );
-                          } else if (toolName === "displayBalance") {
-                            return (
-                              <div key={toolCallId} className="mt-2 text-xs text-gray-400">
-                                Loading balance...
-                              </div>
-                            );
-                          }
-                          // Handle CCTP tool calls
-                          else if (state === "result" && (toolName === "approveUSDC" || toolName === "depositForBurn" || toolName === "receiveMessage")) {
+                          if (state === "result") {
                             const result = (toolInvocation as any).result;
                             if (result.success && result.transactionData) {
                               return (
@@ -163,28 +166,9 @@ export const ChatWidget = () => {
                                   <Button
                                     className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                                     disabled={isLoading || (pendingTx?.toolName === toolName && isReceiptLoading)}
-                                    onClick={() => {
-                                      const txData = result.transactionData;
-                                      sendTransaction({
-                                        to: txData.to,
-                                        data: txData.data,
-                                        value: txData.value === '0' ? BigInt(0) : parseEther(txData.value),
-                                      }, {
-                                        onSuccess: (hash) => {
-                                          toast.loading(`Transaction sent: ${hash.slice(0, 10)}... Waiting for confirmation.`);
-                                          if(toolName === 'depositForBurn') {
-                                            setPendingTx({ hash, toolName });
-                                          } else {
-                                            toast.success(`Transaction ${hash.slice(0,10)}... confirmed!`)
-                                          }
-                                        },
-                                        onError: (error) => {
-                                          toast.error(`Transaction failed: ${error.message}`);
-                                        }
-                                      });
-                                    }}
+                                    onClick={() => handleSignTransaction(toolName, result.transactionData)}
                                   >
-                                    {pendingTx?.toolName === toolName && isReceiptLoading ? 'Verifying...' : 'Sign Transaction'}
+                                    {pendingTx && isReceiptLoading ? 'Verifying...' : 'Sign Transaction'}
                                   </Button>
                                 </div>
                               );
@@ -194,18 +178,23 @@ export const ChatWidget = () => {
                                   <p>{result.message}</p>
                                 </div>
                               );
-                            }
-                             else {
+                            } else if (result.error) {
                               return (
                                 <div key={toolCallId} className="mt-2 text-xs text-red-400">
-                                  Error: {result.error || 'An unknown error occurred.'}
+                                  Error: {result.error}
                                 </div>
                               );
+                            } else if (result.balance) { // For balance tool
+                                return (
+                                  <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
+                                    Balance: {result.balance} ETH
+                                  </div>
+                                );
                             }
-                          } else if (toolName === "approveUSDC" || toolName === "depositForBurn" || toolName === "receiveMessage") {
+                          } else { // Catches 'loading' and other states
                             return (
                               <div key={toolCallId} className="mt-2 text-xs text-gray-400">
-                                Preparing transaction...
+                                Loading...
                               </div>
                             );
                           }
