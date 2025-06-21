@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { useChat } from "ai/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAccount } from "wagmi";
+import { useAccount, useSendTransaction } from "wagmi";
 import { MessageCircle, Send, X, Bot, User } from 'lucide-react';
+import { parseEther } from "viem";
 
 function formatTime(dateInput: string | Date) {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
@@ -15,6 +16,7 @@ function formatTime(dateInput: string | Date) {
 export const ChatWidget = () => {
   const [open, setOpen] = useState(false);
   const { address, isConnected } = useAccount();
+  const { sendTransaction } = useSendTransaction();
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     initialMessages: [
       {
@@ -102,6 +104,49 @@ export const ChatWidget = () => {
                             return (
                               <div key={toolCallId} className="mt-2 text-xs text-gray-400">
                                 Loading balance...
+                              </div>
+                            );
+                          }
+                          // Handle CCTP tool calls
+                          else if (state === "result" && (toolName === "approveUSDC" || toolName === "depositForBurn" || toolName === "receiveMessage")) {
+                            const result = (toolInvocation as any).result;
+                            if (result.success && result.transactionData) {
+                              return (
+                                <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
+                                  <p>{result.message}</p>
+                                  <Button
+                                    className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={() => {
+                                      const txData = result.transactionData;
+                                      sendTransaction({
+                                        to: txData.to,
+                                        data: txData.data,
+                                        value: txData.value ? parseEther(txData.value) : undefined,
+                                      });
+                                    }}
+                                  >
+                                    Sign Transaction
+                                  </Button>
+                                </div>
+                              );
+                            } else if (result.success) {
+                               return (
+                                <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
+                                  <p>{result.message}</p>
+                                </div>
+                              );
+                            }
+                             else {
+                              return (
+                                <div key={toolCallId} className="mt-2 text-xs text-red-400">
+                                  Error: {result.error || 'An unknown error occurred.'}
+                                </div>
+                              );
+                            }
+                          } else if (toolName === "approveUSDC" || toolName === "depositForBurn" || toolName === "receiveMessage") {
+                            return (
+                              <div key={toolCallId} className="mt-2 text-xs text-gray-400">
+                                Preparing transaction...
                               </div>
                             );
                           }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, encodeFunctionData, pad, toHex } from "viem";
 import { lineaSepolia, sepolia, arbitrumSepolia, optimismSepolia } from "wagmi/chains";
 
 // CCTP Contract addresses for each network
@@ -66,6 +66,12 @@ const ERC20_ABI = [
   },
 ] as const;
 
+// Token Messenger ABI
+const TOKEN_MESSENGER_ABI = [{"inputs":[{"internalType":"address","name":"_messageTransmitter","type":"address"},{"internalType":"uint32","name":"_messageBodyVersion","type":"uint32"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint64","name":"nonce","type":"uint64"},{"indexed":true,"internalType":"address","name":"burnToken","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":true,"internalType":"address","name":"depositor","type":"address"},{"indexed":false,"internalType":"bytes32","name":"mintRecipient","type":"bytes32"},{"indexed":false,"internalType":"uint32","name":"destinationDomain","type":"uint32"},{"indexed":false,"internalType":"bytes32","name":"destinationTokenMessenger","type":"bytes32"},{"indexed":false,"internalType":"bytes32","name":"destinationCaller","type":"bytes32"}],"name":"DepositForBurn","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"localMinter","type":"address"}],"name":"LocalMinterAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"localMinter","type":"address"}],"name":"LocalMinterRemoved","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"mintRecipient","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":true,"internalType":"address","name":"mintToken","type":"address"}],"name":"MintAndWithdraw","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint32","name":"domain","type":"uint32"},{"indexed":false,"internalType":"bytes32","name":"tokenMessenger","type":"bytes32"}],"name":"RemoteTokenMessengerAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint32","name":"domain","type":"uint32"},{"indexed":false,"internalType":"bytes32","name":"tokenMessenger","type":"bytes32"}],"name":"RemoteTokenMessengerRemoved","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newRescuer","type":"address"}],"name":"RescuerChanged","type":"event"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newLocalMinter","type":"address"}],"name":"addLocalMinter","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint32","name":"domain","type":"uint32"},{"internalType":"bytes32","name":"tokenMessenger","type":"bytes32"}],"name":"addRemoteTokenMessenger","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"burnLimitsPerMessage","outputs":[{"internalType":"mapping(address => uint256)","name":"","type":"mapping"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint32","name":"destinationDomain","type":"uint32"},{"internalType":"bytes32","name":"mintRecipient","type":"bytes32"},{"internalType":"address","name":"burnToken","type":"address"}],"name":"depositForBurn","outputs":[{"internalType":"uint64","name":"_nonce","type":"uint64"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"localMinter","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"localMessageTransmitter","outputs":[{"internalType":"contract IMessageTransmitter","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"messageBodyVersion","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"removeLocalMinter","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint32","name":"domain","type":"uint32"}],"name":"removeRemoteTokenMessenger","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rescuer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"burnToken","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"setBurnLimitPerMessage","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newRescuer","type":"address"}],"name":"setRescuer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}] as const;
+
+// Message Transmitter ABI
+const MESSAGE_TRANSMITTER_ABI = [{"inputs":[{"internalType":"uint32","name":"_localDomain","type":"uint32"},{"internalType":"address","name":"_attester","type":"address"},{"internalType":"uint32","name":"_maxMessageBodySize","type":"uint32"},{"internalType":"uint32","name":"_version","type":"uint32"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterDisabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterEnabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousAttesterManager","type":"address"},{"indexed":true,"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"AttesterManagerUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"MaxMessageBodySizeUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"caller","type":"address"},{"indexed":false,"internalType":"uint32","name":"sourceDomain","type":"uint32"},{"indexed":true,"internalType":"uint64","name":"nonce","type":"uint64"},{"indexed":false,"internalType":"bytes32","name":"sender","type":"bytes32"},{"indexed":false,"internalType":"bytes","name":"messageBody","type":"bytes"}],"name":"MessageReceived","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"message","type":"bytes"}],"name":"MessageSent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[],"name":"Pause","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newAddress","type":"address"}],"name":"PauserChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newRescuer","type":"address"}],"name":"RescuerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"oldSignatureThreshold","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"SignatureThresholdUpdated","type":"event"},{"anonymous":false,"inputs":[],"name":"Unpause","type":"event"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"attesterManager","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"disableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"enableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint32","name":"","type":"uint32"}],"name":"getEnabledAttester","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getEnabledAttesters","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getLocalDomain","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxMessageBodySize","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"nextAvailableNonce","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pauser","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes","name":"_message","type":"bytes"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"receiveMessage","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rescuer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"setAttesterManager","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"setMaxMessageBodySize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_pauser","type":"address"}],"name":"setPauser","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newRescuer","type":"address"}],"name":"setRescuer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"setSignatureThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"signatureThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"version","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"}] as const;
+
 // Attestation service URL
 const IRIS_ATTESTATION_API_URL = "https://iris-api-sandbox.circle.com";
 
@@ -96,8 +102,6 @@ export async function POST(request: NextRequest) {
         return await handleGetAttestation(messageHash);
       case 'receiveMessage':
         return await handleReceiveMessage(destinationChain, messageBytes, attestation, walletAddress);
-      case 'crossChainTransfer':
-        return await handleCrossChainTransfer(sourceChain, destinationChain, amount, recipientAddress, walletAddress);
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
@@ -126,13 +130,18 @@ function getChainIdFromName(chainName: string): number {
   return chainId;
 }
 
+// Utility to convert address to bytes32
+function addressToBytes32(address: string): `0x${string}` {
+  return pad(toHex(address), { size: 32 });
+}
+
 async function handleApprove(sourceChain: string, amount: string, walletAddress: string) {
   try {
     console.log('Handling approve for:', { sourceChain, amount, walletAddress });
     
     const chainId = getChainIdFromName(sourceChain);
-    const contracts = CCTP_CONTRACTS[chainId];
-    const client = clients[chainId];
+    const contracts = CCTP_CONTRACTS[chainId as keyof typeof CCTP_CONTRACTS];
+    const client = clients[chainId as keyof typeof clients];
     
     if (!contracts || !client) {
       return NextResponse.json({ error: 'Unsupported source chain' }, { status: 400 });
@@ -186,18 +195,19 @@ async function handleApprove(sourceChain: string, amount: string, walletAddress:
       });
     }
 
-    // For now, we'll return a simulated approval since we need wallet integration
-    // In a real implementation, this would trigger a wallet transaction
+    const approveData = encodeFunctionData({
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [contracts.tokenMessenger as `0x${string}`, BigInt(amountInSmallestUnits)],
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'Approval required - please approve USDC spending in your wallet',
-      requiredAmount: amountInSmallestUnits,
-      spender: contracts.tokenMessenger,
-      token: contracts.usdc,
+      message: `Approval required: Please approve ${amount} USDC for the TokenMessenger contract.`,
       transactionData: {
         to: contracts.usdc,
-        data: '0x', // This would be the encoded approve function call
-        value: '0x0',
+        data: approveData,
+        value: '0',
         from: walletAddress,
       },
     });
@@ -219,6 +229,13 @@ async function handleDepositForBurn(
 ) {
   try {
     console.log('Handling depositForBurn:', { sourceChain, destinationChain, amount, recipientAddress, walletAddress });
+    
+    const sourceChainId = getChainIdFromName(sourceChain);
+    const destinationChainId = getChainIdFromName(destinationChain);
+
+    const destinationDomain = CCTP_DOMAINS[destinationChainId as keyof typeof CCTP_DOMAINS];
+    const sourceContracts = CCTP_CONTRACTS[sourceChainId as keyof typeof CCTP_CONTRACTS];
+    const sourceClient = clients[sourceChainId as keyof typeof clients];
     
     // Validate required parameters
     if (!sourceChain || !destinationChain || !amount || !recipientAddress || !walletAddress) {
@@ -249,12 +266,7 @@ async function handleDepositForBurn(
       }, { status: 400 });
     }
     
-    const sourceChainId = getChainIdFromName(sourceChain);
-    const destinationDomain = CCTP_DOMAINS[getChainIdFromName(destinationChain)];
-    const contracts = CCTP_CONTRACTS[sourceChainId];
-    const client = clients[sourceChainId];
-    
-    if (!contracts || !client || destinationDomain === undefined) {
+    if (!sourceContracts || !sourceClient || destinationDomain === undefined) {
       return NextResponse.json({ error: 'Unsupported chain configuration' }, { status: 400 });
     }
 
@@ -276,36 +288,38 @@ async function handleDepositForBurn(
       }, { status: 400 });
     }
 
-    const amountInSmallestUnits = Math.floor(parseFloat(amount) * 1000000).toString();
-    const mintRecipientBytes32 = `0x000000000000000000000000${recipientAddress.slice(2)}`;
+    // Format amount to USDC smallest units (6 decimals)
+    const amountInSmallestUnits = BigInt(Math.floor(parseFloat(amount) * 1000000));
+    
+    // Convert recipient address to bytes32
+    const mintRecipientBytes32 = addressToBytes32(recipientAddress);
 
-    // For now, we'll return a simulated depositForBurn
-    // In a real implementation, this would trigger a wallet transaction
-    const simulatedNonce = Math.floor(Math.random() * 1000000);
-    const simulatedMessageHash = `0x${simulatedNonce.toString(16).padStart(64, '0')}`;
+    const burnData = encodeFunctionData({
+      abi: TOKEN_MESSENGER_ABI,
+      functionName: 'depositForBurn',
+      args: [
+        amountInSmallestUnits,
+        destinationDomain,
+        mintRecipientBytes32,
+        sourceContracts.usdc as `0x${string}`,
+      ],
+    });
 
+    // For now, just returning the transaction data for the user to sign
     return NextResponse.json({
       success: true,
-      message: 'DepositForBurn transaction required - please execute in your wallet',
-      nonce: simulatedNonce,
-      messageHash: simulatedMessageHash,
+      message: `Burn transaction ready: Please sign the transaction to burn ${amount} USDC.`,
       transactionData: {
-        to: contracts.tokenMessenger,
-        data: '0x', // This would be the actual encoded function call
-        value: '0x0',
+        to: sourceContracts.tokenMessenger,
+        data: burnData,
+        value: '0',
         from: walletAddress,
-      },
-      parameters: {
-        amount: amountInSmallestUnits,
-        destinationDomain,
-        mintRecipient: mintRecipientBytes32,
-        burnToken: contracts.usdc,
       },
     });
   } catch (error) {
     console.error('DepositForBurn error:', error);
     return NextResponse.json({ 
-      error: 'Failed to initiate depositForBurn',
+      error: 'Failed to prepare burn transaction',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
@@ -316,44 +330,32 @@ async function handleGetAttestation(messageHash: string) {
     console.log('Handling getAttestation for:', messageHash);
     
     if (!messageHash) {
-      return NextResponse.json({ error: 'Message hash is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing messageHash parameter' }, { status: 400 });
     }
 
+    console.log(`Fetching attestation for messageHash: ${messageHash}`);
+    
+    let attestationResponse;
     // Poll for attestation
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes with 5-second intervals
-    
-    while (attempts < maxAttempts) {
-      attempts++;
-      
-      try {
-        const response = await fetch(`${IRIS_ATTESTATION_API_URL}/attestations/${messageHash}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'complete' && data.attestation) {
-            return NextResponse.json({
-              success: true,
-              attestation: data.attestation,
-              status: data.status,
-            });
-          }
-        } else if (response.status !== 404) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    for (let i = 0; i < 20; i++) { // Poll for ~2 minutes
+      const response = await fetch(`${IRIS_ATTESTATION_API_URL}/attestations/${messageHash}`);
+      if (response.ok) {
+        attestationResponse = await response.json();
+        if (attestationResponse.status === 'complete') {
+          return NextResponse.json({
+            success: true,
+            attestation: attestationResponse.attestation,
+            messageBytes: attestationResponse.message,
+          });
         }
-      } catch (error) {
-        console.error(`Attestation polling attempt ${attempts} failed:`, error);
       }
-      
-      // Wait 5 seconds before next attempt
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 6000)); // Wait 6 seconds
     }
-    
-    return NextResponse.json({
-      error: 'Attestation not available after maximum attempts',
-    }, { status: 408 });
+
+    return NextResponse.json({ error: 'Attestation not found or timed out' }, { status: 404 });
+
   } catch (error) {
-    console.error('GetAttestation error:', error);
+    console.error('Attestation error:', error);
     return NextResponse.json({ 
       error: 'Failed to get attestation',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -368,124 +370,40 @@ async function handleReceiveMessage(
   walletAddress: string
 ) {
   try {
-    console.log('Handling receiveMessage:', { destinationChain, walletAddress });
+    console.log('Handling receiveMessage:', { destinationChain, messageBytes, attestation, walletAddress });
     
-    const destinationChainId = getChainIdFromName(destinationChain);
-    const contracts = CCTP_CONTRACTS[destinationChainId];
-    const client = clients[destinationChainId];
+    const chainId = getChainIdFromName(destinationChain);
+    const contracts = CCTP_CONTRACTS[chainId as keyof typeof CCTP_CONTRACTS];
+    const client = clients[chainId as keyof typeof clients];
     
     if (!contracts || !client) {
       return NextResponse.json({ error: 'Unsupported destination chain' }, { status: 400 });
     }
 
     if (!messageBytes || !attestation) {
-      return NextResponse.json({ error: 'Message bytes and attestation are required' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing messageBytes or attestation' }, { status: 400 });
     }
 
-    // For now, we'll return a simulated receiveMessage
-    // In a real implementation, this would trigger a wallet transaction
+    const receiveData = encodeFunctionData({
+      abi: MESSAGE_TRANSMITTER_ABI,
+      functionName: 'receiveMessage',
+      args: [messageBytes as `0x${string}`, attestation as `0x${string}`],
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'ReceiveMessage transaction required - please execute in your wallet',
+      message: 'Mint transaction ready: Please sign the transaction to mint your USDC.',
       transactionData: {
         to: contracts.messageTransmitter,
-        data: '0x', // This would be the actual encoded function call
-        value: '0x0',
+        data: receiveData,
+        value: '0',
         from: walletAddress,
-      },
-      parameters: {
-        message: messageBytes,
-        attestation,
       },
     });
   } catch (error) {
     console.error('ReceiveMessage error:', error);
     return NextResponse.json({ 
-      error: 'Failed to execute receiveMessage',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
-}
-
-async function handleCrossChainTransfer(
-  sourceChain: string,
-  destinationChain: string,
-  amount: string,
-  recipientAddress: string,
-  walletAddress: string
-) {
-  try {
-    console.log('Handling complete cross-chain transfer:', { 
-      sourceChain, destinationChain, amount, recipientAddress, walletAddress 
-    });
-
-    // Step 1: Approve USDC
-    const approveResult = await handleApprove(sourceChain, amount, walletAddress);
-    if (!approveResult.ok) {
-      const errorData = await approveResult.json();
-      return NextResponse.json({ 
-        error: 'Approval failed', 
-        details: errorData 
-      }, { status: 500 });
-    }
-
-    // Step 2: Deposit for burn
-    const burnResult = await handleDepositForBurn(sourceChain, destinationChain, amount, recipientAddress, walletAddress);
-    if (!burnResult.ok) {
-      const errorData = await burnResult.json();
-      return NextResponse.json({ 
-        error: 'DepositForBurn failed', 
-        details: errorData 
-      }, { status: 500 });
-    }
-
-    const burnData = await burnResult.json();
-    const messageHash = burnData.messageHash;
-
-    // Step 3: Get attestation
-    const attestationResult = await handleGetAttestation(messageHash);
-    if (!attestationResult.ok) {
-      const errorData = await attestationResult.json();
-      return NextResponse.json({ 
-        error: 'Attestation failed', 
-        details: errorData 
-      }, { status: 500 });
-    }
-
-    const attestationData = await attestationResult.json();
-
-    // Step 4: Receive message (mint)
-    const mintResult = await handleReceiveMessage(
-      destinationChain, 
-      attestationData.messageBytes || '0x', 
-      attestationData.attestation, 
-      walletAddress
-    );
-
-    if (!mintResult.ok) {
-      const errorData = await mintResult.json();
-      return NextResponse.json({ 
-        error: 'ReceiveMessage failed', 
-        details: errorData 
-      }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Cross-chain transfer of ${amount} USDC from ${sourceChain} to ${destinationChain} completed successfully!`,
-      steps: {
-        approval: 'Completed',
-        burn: 'Completed',
-        attestation: 'Completed',
-        mint: 'Completed',
-      },
-      messageHash,
-      attestation: attestationData.attestation,
-    });
-  } catch (error) {
-    console.error('Cross-chain transfer error:', error);
-    return NextResponse.json({ 
-      error: 'Cross-chain transfer failed',
+      error: 'Failed to prepare mint transaction',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
