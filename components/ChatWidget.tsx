@@ -57,13 +57,25 @@ export const ChatWidget = () => {
 
           append({
             role: 'user',
-            content: `The burn transaction was successful. Get the attestation for message hash: ${messageHash}`,
+            content: `The burn transaction was successful (message hash: ${messageHash}). Please get the attestation and then use it to mint the tokens on the destination chain.`,
           });
           
-          toast.success("Burn successful! Fetching attestation...");
+          toast.success("Burn successful! Fetching attestation and preparing to mint...");
         } else {
           toast.error("Could not find MessageSent event in the transaction logs.");
         }
+      } else if (pendingTx.toolName === 'receiveMessage') {
+        toast.success(`Minting transaction confirmed! Your USDC should now be available.`);
+        append({
+            role: 'user',
+            content: `The minting transaction was successful. Please check my token balances now to confirm the transfer.`,
+        });
+      } else if (pendingTx.toolName === 'approveUSDC') {
+        toast.success(`Approval transaction successful!`);
+        append({
+            role: 'user',
+            content: `The approval was successful. Now, please proceed with burning the tokens.`,
+        });
       } else {
         toast.success(`Transaction ${pendingTx.hash.slice(0, 10)}... confirmed!`);
       }
@@ -85,7 +97,7 @@ export const ChatWidget = () => {
     }, {
       onSuccess: (hash) => {
         toast.loading(`Transaction sent: ${hash.slice(0, 10)}... Waiting for confirmation.`);
-        if (toolName === 'depositForBurn') {
+        if (toolName === 'depositForBurn' || toolName === 'receiveMessage' || toolName === 'approveUSDC') {
           setPendingTx({ hash, toolName });
         } else {
           toast.success(`Transaction confirmed: ${hash.slice(0, 10)}...`);

@@ -237,59 +237,32 @@ async function handleDepositForBurn(
     const sourceContracts = CCTP_CONTRACTS[sourceChainId as keyof typeof CCTP_CONTRACTS];
     const sourceClient = clients[sourceChainId as keyof typeof clients];
     
-    // Validate required parameters
-    if (!sourceChain || !destinationChain || !amount || !recipientAddress || !walletAddress) {
-      return NextResponse.json({
-        error: 'Missing required parameters for depositForBurn',
-        requiredParameters: {
-          sourceChain: 'sepolia | lineaSepolia | arbitrumSepolia | optimismSepolia',
-          destinationChain: 'sepolia | lineaSepolia | arbitrumSepolia | optimismSepolia',
-          amount: 'USDC amount (e.g., "2")',
-          recipientAddress: 'Destination wallet address (0x...)',
-          walletAddress: 'Sender wallet address (0x...)',
-        },
-        received: {
-          sourceChain,
-          destinationChain,
-          amount,
-          recipientAddress,
-          walletAddress,
-        },
-        example: {
-          action: 'depositForBurn',
-          sourceChain: 'sepolia',
-          destinationChain: 'arbitrumSepolia',
-          amount: '2',
-          recipientAddress: '0x1234567890123456789012345678901234567890',
-          walletAddress: '0x1234567890123456789012345678901234567890'
-        }
-      }, { status: 400 });
-    }
-    
     if (!sourceContracts || !sourceClient || destinationDomain === undefined) {
       return NextResponse.json({ error: 'Unsupported chain configuration' }, { status: 400 });
     }
-
-    // Validate wallet address format
-    if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-      return NextResponse.json({
-        error: 'Invalid wallet address format',
-        details: 'Wallet address must be a valid Ethereum address (0x followed by 40 hex characters)',
-        received: walletAddress
-      }, { status: 400 });
-    }
-
-    // Validate recipient address format
+    
+    // Validate recipient address
     if (!recipientAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-      return NextResponse.json({
-        error: 'Invalid recipient address format',
-        details: 'Recipient address must be a valid Ethereum address (0x followed by 40 hex characters)',
-        received: recipientAddress
-      }, { status: 400 });
+      return NextResponse.json({ error: `Invalid recipient address: ${recipientAddress}` }, { status: 400 });
     }
 
     // Format amount to USDC smallest units (6 decimals)
     const amountInSmallestUnits = BigInt(Math.floor(parseFloat(amount) * 1000000));
+
+    // Check allowance before proceeding
+    const currentAllowance = await sourceClient.readContract({
+      address: sourceContracts.usdc as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [walletAddress as `0x${string}`, sourceContracts.tokenMessenger as `0x${string}`],
+    });
+
+    if (currentAllowance < amountInSmallestUnits) {
+      return NextResponse.json({
+        success: false,
+        error: `Insufficient USDC allowance. Required: ${amountInSmallestUnits.toString()}, but only have ${currentAllowance.toString()}. Please approve the contract to spend your USDC first.`,
+      }, { status: 400 });
+    }
     
     // Convert recipient address to bytes32
     const mintRecipientBytes32 = addressToBytes32(recipientAddress);
