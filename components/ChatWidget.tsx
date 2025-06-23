@@ -5,8 +5,8 @@ import { useChat } from "ai/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
-import { MessageCircle, Send, X, Bot, User } from 'lucide-react';
-import { keccak256, decodeEventLog, parseEther, toHex } from "viem";
+import { MessageCircle, Send, X, Bot, User, Copy, Check } from 'lucide-react';
+import { keccak256, decodeEventLog, parseEther, toHex, formatEther } from "viem";
 import { toast } from 'react-hot-toast';
 
 const MESSAGE_TRANSMITTER_ABI = [{"inputs":[{"internalType":"uint32","name":"_localDomain","type":"uint32"},{"internalType":"address","name":"_attester","type":"address"},{"internalType":"uint32","name":"_maxMessageBodySize","type":"uint32"},{"internalType":"uint32","name":"_version","type":"uint32"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterDisabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterEnabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousAttesterManager","type":"address"},{"indexed":true,"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"AttesterManagerUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"MaxMessageBodySizeUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"caller","type":"address"},{"indexed":false,"internalType":"uint32","name":"sourceDomain","type":"uint32"},{"indexed":true,"internalType":"uint64","name":"nonce","type":"uint64"},{"indexed":false,"internalType":"bytes32","name":"sender","type":"bytes32"},{"indexed":false,"internalType":"bytes","name":"messageBody","type":"bytes"}],"name":"MessageReceived","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"message","type":"bytes"}],"name":"MessageSent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[],"name":"Pause","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newAddress","type":"address"}],"name":"PauserChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newRescuer","type":"address"}],"name":"RescuerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"oldSignatureThreshold","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"SignatureThresholdUpdated","type":"event"},{"anonymous":false,"inputs":[],"name":"Unpause","type":"event"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"attesterManager","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"disableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"enableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint32","name":"","type":"uint32"}],"name":"getEnabledAttester","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getEnabledAttesters","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getLocalDomain","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxMessageBodySize","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"nextAvailableNonce","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pauser","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes","name":"_message","type":"bytes"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"receiveMessage","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rescuer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"setAttesterManager","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"setMaxMessageBodySize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_pauser","type":"address"}],"name":"setPauser","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newRescuer","type":"address"}],"name":"setRescuer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"setSignatureThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"signatureThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"version","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"}] as const;
@@ -15,6 +15,58 @@ function formatTime(dateInput: string | Date) {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+const truncate = (str: string, len: number = 10) => {
+  if (!str) return '';
+  if (str.length <= len + 2) return str;
+  const separator = '...';
+  const charsToShow = len;
+  const frontChars = Math.ceil(charsToShow / 2);
+  const backChars = Math.floor(charsToShow / 2);
+  return str.substring(0, frontChars + 2) + separator + str.substring(str.length - backChars);
+};
+
+const CopyButton = ({ textToCopy }: { textToCopy: string }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    toast.success('Copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button onClick={handleCopy} className="p-1 text-gray-400 hover:text-white transition-colors">
+      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+};
+
+const TransactionCard = ({ txData }: { txData: any }) => {
+  if (!txData) return null;
+
+  const details = [
+    { label: 'To', value: txData.to, copyable: true },
+    { label: 'Value', value: `${formatEther(BigInt(txData.value))} ETH`, copyable: false },
+    { label: 'Data', value: txData.data, copyable: true },
+  ];
+
+  return (
+    <div className="mt-2 p-3 bg-gray-900/50 rounded-lg border border-gray-600 text-xs">
+      <div className="space-y-2">
+        {details.map(({ label, value, copyable }) => (
+          <div key={label} className="flex justify-between items-center text-gray-300">
+            <span className="font-medium text-gray-400">{label}</span>
+            <div className="flex items-center space-x-2 font-mono bg-gray-800 px-2 py-1 rounded">
+              <span className="break-all">{truncate(value, 18)}</span>
+              {copyable && <CopyButton textToCopy={value} />}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const ChatWidget = () => {
   const [open, setOpen] = useState(false);
@@ -57,7 +109,7 @@ export const ChatWidget = () => {
 
           append({
             role: 'user',
-            content: `The burn transaction was successful (message hash: ${messageHash}). Please get the attestation and then use it to mint the tokens on the destination chain.`,
+            content: `The burn transaction was successful (message hash: ${truncate(messageHash)}). Please get the attestation and then use it to mint the tokens on the destination chain.`,
           });
           
           toast.success("Burn successful! Fetching attestation and preparing to mint...");
@@ -164,7 +216,7 @@ export const ChatWidget = () => {
                       {!isAI && (
                         <User className="h-4 w-4 mt-1 text-white flex-shrink-0" />
                       )}
-                      <div>
+                      <div className="w-full">
                         <p className="text-sm break-words">{message.content}</p>
                         {/* Tool results */}
                         {Array.isArray(message.toolInvocations) && message.toolInvocations.map((toolInvocation) => {
@@ -173,10 +225,11 @@ export const ChatWidget = () => {
                             const result = (toolInvocation as any).result;
                             if (result.success && result.transactionData) {
                               return (
-                                <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
-                                  <p>{result.message}</p>
+                                <div key={toolCallId} className="w-full mt-2">
+                                  <p className="text-sm text-gray-100">{result.message}</p>
+                                  <TransactionCard txData={result.transactionData} />
                                   <Button
-                                    className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                                     disabled={isLoading || (pendingTx?.toolName === toolName && isReceiptLoading)}
                                     onClick={() => handleSignTransaction(toolName, result.transactionData)}
                                   >
