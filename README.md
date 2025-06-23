@@ -34,3 +34,19 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Environment Variables for Circle CCTP
+
+To use Circle CCTP cross-chain transfer features, you must add the following to your `.env` file:
+
+```
+CIRCLE_WALLET_API_KEY=your_circle_api_key
+CIRCLE_ENTITY_SECRET=your_circle_entity_secret
+CIRCLE_WALLET_ID=your_circle_wallet_id
+```
+
+- `CIRCLE_WALLET_API_KEY`: Your API key from the Circle developer dashboard.
+- `CIRCLE_ENTITY_SECRET`: Your entity secret (see Circle docs for how to generate and register this).
+- `CIRCLE_WALLET_ID`: The wallet ID from your Circle dashboard.
+
+These are required for all cross-chain and contract operations with Circle's SDK.

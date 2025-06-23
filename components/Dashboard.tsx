@@ -5,15 +5,7 @@ import { Chat } from "@/components/Chat";
 import { useAccount } from "wagmi";
 import { useState } from "react";
 import { ChatWidget } from "@/components/ChatWidget";
-
-const mockPortfolio = {
-  total: 126082.5,
-  invested: 120000,
-  gain: 5750,
-  today: 3179.41,
-  todayPct: 2.58,
-  aiScore: 8.7,
-};
+import { usePortfolio } from "@/lib/hooks/usePortfolio";
 
 const mockRecommendations = [
   { symbol: "NVDA", action: "Strong Buy", price: 875.3, change: 2.4, confidence: 92, note: "AI chip demand surge expected" },
@@ -52,6 +44,45 @@ const mockNews = [
 export const Dashboard = () => {
   const { isConnected } = useAccount();
   const [tab, setTab] = useState("1D");
+  const { portfolioData, loading, error } = usePortfolio();
+
+  // Calculate real allocation based on actual balances
+  const calculateRealAllocation = () => {
+    if (!portfolioData) return mockAllocation;
+    
+    const totalValue = portfolioData.total;
+    if (totalValue === 0) return mockAllocation;
+    
+    const allocation: { label: string; value: number; color: string; }[] = [];
+    Object.keys(portfolioData.balances).forEach(network => {
+      const balance = portfolioData.balances[network];
+      const price = portfolioData.prices[network] || 0;
+      const value = balance * price;
+      const percentage = (value / totalValue) * 100;
+      
+      if (percentage > 0) {
+        allocation.push({
+          label: network.charAt(0).toUpperCase() + network.slice(1),
+          value: Math.round(percentage * 100) / 100,
+          color: getNetworkColor(network),
+        });
+      }
+    });
+    
+    return allocation.length > 0 ? allocation : mockAllocation;
+  };
+
+  const getNetworkColor = (network: string) => {
+    const colors = {
+      sepolia: "#22d3ee",
+      lineaSepolia: "#818cf8", 
+      arbitrumSepolia: "#a78bfa",
+      optimismSepolia: "#fbbf24",
+    };
+    return colors[network as keyof typeof colors] || "#a3a3a3";
+  };
+
+  const realAllocation = calculateRealAllocation();
 
   return (
     <div className="min-h-screen bg-[#181f2a] text-white p-6 sm:p-10 font-sans">
@@ -63,7 +94,7 @@ export const Dashboard = () => {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-400">AI Engine Active</span>
           <ConnectButton />
-          <div className="rounded-full bg-gray-700 px-4 py-2 text-sm font-medium">John Doe</div>
+          <div className="rounded-full bg-gray-700 px-4 py-2 text-sm font-medium"></div>
         </div>
       </header>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -72,31 +103,70 @@ export const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-semibold">Portfolio Overview</h2>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-3xl font-bold">${mockPortfolio.total.toLocaleString()}</span>
-                <span className="text-green-400 text-sm">+${mockPortfolio.today.toLocaleString()} ({mockPortfolio.todayPct}%) Today</span>
-              </div>
-              <div className="flex gap-8 mt-4 text-gray-300">
-                <div>
-                  <div className="font-bold text-white">${mockPortfolio.invested.toLocaleString()}</div>
-                  <div className="text-xs">Total Invested</div>
+              {loading ? (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+                  <span className="text-gray-400">Loading portfolio data...</span>
                 </div>
-                <div>
-                  <div className="font-bold text-green-400">+${mockPortfolio.gain.toLocaleString()}</div>
-                  <div className="text-xs">Total Gain</div>
-                </div>
-                <div>
-                  <div className="font-bold text-blue-400">{mockPortfolio.aiScore}/10</div>
-                  <div className="text-xs">AI Score</div>
-                </div>
-              </div>
+              ) : error ? (
+                <div className="text-red-400 mt-2">Error: {error}</div>
+              ) : !isConnected ? (
+                <div className="text-gray-400 mt-2">Please connect your wallet to view portfolio</div>
+              ) : portfolioData ? (
+                <>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-3xl font-bold">${portfolioData.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className={`text-sm ${portfolioData.today >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {portfolioData.today >= 0 ? "+" : ""}${portfolioData.today.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({portfolioData.todayPct >= 0 ? "+" : ""}{portfolioData.todayPct.toFixed(2)}%) Today
+                    </span>
+                  </div>
+                  <div className="flex gap-8 mt-4 text-gray-300">
+                    <div>
+                      <div className="font-bold text-white">${portfolioData.invested.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-xs">Total Invested</div>
+                    </div>
+                    <div>
+                      <div className={`font-bold ${portfolioData.gain >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {portfolioData.gain >= 0 ? "+" : ""}${portfolioData.gain.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs">Total Gain</div>
+                    </div>
+                    <div>
+                      <div className="font-bold text-blue-400">{portfolioData.aiScore}/10</div>
+                      <div className="text-xs">AI Score</div>
+                    </div>
+                  </div>
+                  {/* Network Balances */}
+                  <div className="mt-4 p-3 bg-[#1a2233] rounded-lg">
+                    <div className="text-xs text-gray-400 mb-2">Network Balances</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.keys(portfolioData.balances).map(network => {
+                        const balance = portfolioData.balances[network];
+                        const price = portfolioData.prices[network] || 0;
+                        const value = balance * price;
+                        return (
+                          <div key={network} className="flex justify-between text-xs">
+                            <span className="text-gray-300">{network.charAt(0).toUpperCase() + network.slice(1)}:</span>
+                            <span className="text-white">
+                              {balance.toFixed(4)} ETH (${value.toFixed(2)})
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-gray-400 mt-2">No portfolio data available</div>
+              )}
             </div>
             <div className="flex flex-col items-end gap-2">
-              <span className="flex items-center gap-2 text-green-400 text-xs"><span className="w-2 h-2 bg-green-400 rounded-full"></span>Live</span>
+              <span className="flex items-center gap-2 text-green-400 text-xs">
+                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                {loading ? "Loading..." : "Live"}
+              </span>
             </div>
           </div>
-          {/* Remove Chat from Portfolio Overview */}
-          {/* {isConnected && <div className="mt-6"><Chat /></div>} */}
         </section>
         {/* AI Recommendations */}
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col gap-4">
@@ -134,12 +204,12 @@ export const Dashboard = () => {
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#22d3ee" strokeWidth="2"/></svg> Asset Allocation</h2>
           <div className="h-48 flex items-center justify-center">
-            {/* Mock Donut Chart */}
+            {/* Real Donut Chart */}
             <div className="relative w-36 h-36">
               <svg viewBox="0 0 36 36" className="w-full h-full">
                 {(() => {
                   let acc = 0;
-                  return mockAllocation.map((a, i) => {
+                  return realAllocation.map((a, i) => {
                     const val = (a.value / 100) * 100;
                     const dash = val * 1.13;
                     const gap = 113 - dash;
@@ -159,14 +229,16 @@ export const Dashboard = () => {
                   });
                 })()}
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center text-xl font-bold">100%</div>
+              <div className="absolute inset-0 flex items-center justify-center text-xl font-bold">
+                {realAllocation.reduce((sum, a) => sum + a.value, 0).toFixed(1)}%
+              </div>
             </div>
           </div>
           <ul className="mt-6 space-y-2">
-            {mockAllocation.map((a) => (
+            {realAllocation.map((a) => (
               <li key={a.label} className="flex items-center gap-2 text-sm">
                 <span className="inline-block w-3 h-3 rounded-full" style={{ background: a.color }}></span>
-                {a.label} <span className="ml-auto font-bold">{a.value}%</span>
+                {a.label} <span className="ml-auto font-bold">{a.value.toFixed(1)}%</span>
               </li>
             ))}
           </ul>

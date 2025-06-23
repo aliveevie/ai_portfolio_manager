@@ -4,18 +4,106 @@ import { useState, useRef, useEffect } from "react";
 import { useChat } from "ai/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAccount } from "wagmi";
-import { MessageCircle, Send, X, Bot, User } from 'lucide-react';
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
+import { MessageCircle, Send, X, Bot, User, Copy, Check } from 'lucide-react';
+import { keccak256, decodeEventLog, parseEther, toHex, formatEther } from "viem";
+import { toast } from 'react-hot-toast';
+import React from 'react';
+
+const MESSAGE_TRANSMITTER_ABI = [{"inputs":[{"internalType":"uint32","name":"_localDomain","type":"uint32"},{"internalType":"address","name":"_attester","type":"address"},{"internalType":"uint32","name":"_maxMessageBodySize","type":"uint32"},{"internalType":"uint32","name":"_version","type":"uint32"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterDisabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterEnabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousAttesterManager","type":"address"},{"indexed":true,"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"AttesterManagerUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"MaxMessageBodySizeUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"caller","type":"address"},{"indexed":false,"internalType":"uint32","name":"sourceDomain","type":"uint32"},{"indexed":true,"internalType":"uint64","name":"nonce","type":"uint64"},{"indexed":false,"internalType":"bytes32","name":"sender","type":"bytes32"},{"indexed":false,"internalType":"bytes","name":"messageBody","type":"bytes"}],"name":"MessageReceived","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"message","type":"bytes"}],"name":"MessageSent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[],"name":"Pause","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newAddress","type":"address"}],"name":"PauserChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newRescuer","type":"address"}],"name":"RescuerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"oldSignatureThreshold","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"SignatureThresholdUpdated","type":"event"},{"anonymous":false,"inputs":[],"name":"Unpause","type":"event"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"attesterManager","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"disableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"enableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint32","name":"","type":"uint32"}],"name":"getEnabledAttester","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getEnabledAttesters","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getLocalDomain","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxMessageBodySize","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"nextAvailableNonce","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pauser","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes","name":"_message","type":"bytes"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"receiveMessage","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rescuer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"setAttesterManager","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"setMaxMessageBodySize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_pauser","type":"address"}],"name":"setPauser","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newRescuer","type":"address"}],"name":"setRescuer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"setSignatureThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"signatureThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"version","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"}] as const;
 
 function formatTime(dateInput: string | Date) {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+const truncate = (str: string, len: number = 10) => {
+  if (!str) return '';
+  if (str.length <= len + 2) return str;
+  const separator = '...';
+  const charsToShow = len;
+  const frontChars = Math.ceil(charsToShow / 2);
+  const backChars = Math.floor(charsToShow / 2);
+  return str.substring(0, frontChars + 2) + separator + str.substring(str.length - backChars);
+};
+
+const CodeBlock = ({ text }: { text: string }) => (
+  <span className="inline-block bg-gray-800 text-gray-200 px-2 py-1 rounded-md font-mono text-xs break-all">
+    {text}
+  </span>
+);
+
+const FormattedMessage = ({ content }: { content: string }) => {
+  const parts = content.split(/(`[^`]+`)/g);
+
+  return (
+    <p className="text-sm break-words">
+      {parts.map((part, i) => {
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return <CodeBlock key={i} text={part.slice(1, -1)} />;
+        }
+        // Replace **bold** with <strong>
+        const boldParts = part.split(/(\*\*.*?\*\*)/g);
+        return boldParts.map((boldPart, j) => {
+          if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
+            return <strong key={`${i}-${j}`}>{boldPart.slice(2, -2)}</strong>;
+          }
+          return boldPart;
+        });
+      })}
+    </p>
+  );
+};
+
+const CopyButton = ({ textToCopy }: { textToCopy: string }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    toast.success('Copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button onClick={handleCopy} className="p-1 text-gray-400 hover:text-white transition-colors">
+      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+};
+
+const TransactionCard = ({ txData }: { txData: any }) => {
+  if (!txData) return null;
+
+  const details = [
+    { label: 'To', value: txData.to, copyable: true },
+    { label: 'Value', value: `${formatEther(BigInt(txData.value))} ETH`, copyable: false },
+    { label: 'Data', value: txData.data, copyable: true },
+  ];
+
+  return (
+    <div className="mt-2 p-3 bg-gray-900/50 rounded-lg border border-gray-600 text-xs">
+      <div className="space-y-2">
+        {details.map(({ label, value, copyable }) => (
+          <div key={label} className="flex justify-between items-center text-gray-300">
+            <span className="font-medium text-gray-400">{label}</span>
+            <div className="flex items-center space-x-2 font-mono bg-gray-800 px-2 py-1 rounded">
+              <span className="break-all">{truncate(value, 18)}</span>
+              {copyable && <CopyButton textToCopy={value} />}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const ChatWidget = () => {
   const [open, setOpen] = useState(false);
+  const [pendingTx, setPendingTx] = useState<{ hash: `0x${string}`; toolName: string } | null>(null);
   const { address, isConnected } = useAccount();
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const { sendTransaction } = useSendTransaction();
+  
+  const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat({
     initialMessages: [
       {
         role: "system",
@@ -26,10 +114,81 @@ export const ChatWidget = () => {
       },
     ],
   });
+  
+  const { data: receipt, isLoading: isReceiptLoading } = useWaitForTransactionReceipt({ 
+    hash: pendingTx?.hash,
+  });
+
+  useEffect(() => {
+    if (receipt && pendingTx) {
+      if (pendingTx.toolName === 'depositForBurn') {
+        const messageSentLog = receipt.logs.find(
+          (log: any) => log.topics[0] === keccak256(toHex('MessageSent(bytes)'))
+        );
+
+        if (messageSentLog) {
+          const decodedLog = decodeEventLog({
+            abi: MESSAGE_TRANSMITTER_ABI,
+            data: messageSentLog.data,
+            topics: messageSentLog.topics,
+          });
+
+          const message = (decodedLog.args as any).message;
+          const messageHash = keccak256(message);
+
+          append({
+            role: 'user',
+            content: `The burn transaction was successful (message hash: ${truncate(messageHash)}). Please get the attestation and then use it to mint the tokens on the destination chain.`,
+          });
+          
+          toast.success("Burn successful! Fetching attestation and preparing to mint...");
+        } else {
+          toast.error("Could not find MessageSent event in the transaction logs.");
+        }
+      } else if (pendingTx.toolName === 'receiveMessage') {
+        toast.success(`Minting transaction confirmed! Your USDC should now be available.`);
+        append({
+            role: 'user',
+            content: `The minting transaction was successful. Please check my token balances now to confirm the transfer.`,
+        });
+      } else if (pendingTx.toolName === 'approveUSDC') {
+        toast.success(`Approval transaction successful!`);
+        append({
+            role: 'user',
+            content: `The approval was successful. Now, please proceed with burning the tokens.`,
+        });
+      } else {
+        toast.success(`Transaction ${pendingTx.hash.slice(0, 10)}... confirmed!`);
+      }
+      setPendingTx(null);
+    }
+  }, [receipt, pendingTx, append]);
+
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleSignTransaction = (toolName: string, transactionData: any) => {
+    sendTransaction({
+      to: transactionData.to,
+      data: transactionData.data,
+      value: BigInt(transactionData.value)
+    }, {
+      onSuccess: (hash) => {
+        toast.loading(`Transaction sent: ${hash.slice(0, 10)}... Waiting for confirmation.`);
+        if (toolName === 'depositForBurn' || toolName === 'receiveMessage' || toolName === 'approveUSDC') {
+          setPendingTx({ hash, toolName });
+        } else {
+          toast.success(`Transaction confirmed: ${hash.slice(0, 10)}...`);
+        }
+      },
+      onError: (error) => {
+        toast.error(`Transaction failed: ${error.message}`);
+      }
+    });
+  };
 
   return (
     <>
@@ -73,35 +232,63 @@ export const ChatWidget = () => {
                   className={`flex w-full ${isAI ? 'justify-start' : 'justify-end'}`}
                 >
                   <div
-                    className={`max-w-[90%] break-words whitespace-pre-line rounded-lg px-3 py-2 ${
+                    className={`max-w-[90%] break-words whitespace-pre-line rounded-lg px-4 py-3 ${
                       isAI
                         ? 'bg-gray-700 text-gray-100'
                         : 'bg-emerald-500 text-white'
                     }`}
                   >
-                    <div className="flex items-start space-x-2">
+                    <div className="flex items-start space-x-3">
                       {isAI && (
                         <Bot className="h-4 w-4 mt-1 text-emerald-400 flex-shrink-0" />
                       )}
                       {!isAI && (
                         <User className="h-4 w-4 mt-1 text-white flex-shrink-0" />
                       )}
-                      <div>
-                        <p className="text-sm break-words">{message.content}</p>
-                        {/* Tool results (e.g., balance) */}
+                      <div className="w-full">
+                        <FormattedMessage content={message.content} />
+                        {/* Tool results */}
                         {Array.isArray(message.toolInvocations) && message.toolInvocations.map((toolInvocation) => {
                           const { toolName, toolCallId, state } = toolInvocation;
-                          if (state === "result" && toolName === "displayBalance") {
+                          if (state === "result") {
                             const result = (toolInvocation as any).result;
-                            return (
-                              <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
-                                Balance: {result?.balance} ETH
-                              </div>
-                            );
-                          } else if (toolName === "displayBalance") {
+                            if (result.success && result.transactionData) {
+                              return (
+                                <div key={toolCallId} className="w-full mt-2">
+                                  <p className="text-sm text-gray-100">{result.message}</p>
+                                  <TransactionCard txData={result.transactionData} />
+                                  <Button
+                                    className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    disabled={isLoading || (pendingTx?.toolName === toolName && isReceiptLoading)}
+                                    onClick={() => handleSignTransaction(toolName, result.transactionData)}
+                                  >
+                                    {pendingTx && isReceiptLoading ? 'Verifying...' : 'Sign Transaction'}
+                                  </Button>
+                                </div>
+                              );
+                            } else if (result.success) {
+                               return (
+                                <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
+                                  <p>{result.message}</p>
+                                </div>
+                              );
+                            } else if (result.error) {
+                              return (
+                                <div key={toolCallId} className="mt-2 text-xs text-red-400">
+                                  Error: {result.error}
+                                </div>
+                              );
+                            } else if (result.balance) { // For balance tool
+                                return (
+                                  <div key={toolCallId} className="mt-2 text-xs text-emerald-300">
+                                    Balance: {result.balance} ETH
+                                  </div>
+                                );
+                            }
+                          } else { // Catches 'loading' and other states
                             return (
                               <div key={toolCallId} className="mt-2 text-xs text-gray-400">
-                                Loading balance...
+                                Loading...
                               </div>
                             );
                           }
