@@ -408,6 +408,64 @@ const receiveMessageTool = createTool({
   },
 });
 
+// --- AI Recommendation Tool ---
+import { z as zod } from "zod";
+
+const aiRecommendationTool = createTool({
+  description: "Get AI-powered investment recommendations for real/testnet tokens based on wallet balances and price changes.",
+  parameters: zod.object({
+    address: zod.string().describe("The wallet address to analyze for recommendations"),
+  }),
+  execute: async ({ address }) => {
+    // For demo: Use testnet ETH balances as 'tokens' and mock price changes
+    const networks = [
+      { key: "sepolia", label: "Sepolia" },
+      { key: "lineaSepolia", label: "Linea" },
+      { key: "arbitrumSepolia", label: "Arbitrum" },
+      { key: "optimismSepolia", label: "Optimism" },
+    ];
+    const clients = {
+      sepolia: sepoliaClient,
+      lineaSepolia: lineaSepoliaClient,
+      arbitrumSepolia: arbitrumSepoliaClient,
+      optimismSepolia: optimismSepoliaClient,
+    };
+    // Simulate price and change for each network (in real app, fetch from price API)
+    const priceMap = {
+      sepolia: { price: 1875.3, change: 2.4 },
+      lineaSepolia: { price: 485.2, change: -1.2 },
+      arbitrumSepolia: { price: 180.45, change: 0.8 },
+      optimismSepolia: { price: 92.1, change: 3.1 },
+    };
+    // Heuristic for recommendation
+    function getRecommendation(change: number) {
+      if (change > 2) return { action: "Strong Buy", confidence: 92, note: "Positive momentum expected" };
+      if (change < -1) return { action: "Consider Sell", confidence: 78, note: "Negative trend detected" };
+      return { action: "Hold", confidence: 85, note: "Stable performance expected" };
+    }
+    // Fetch balances and build recommendations
+    const recs = [];
+    for (const net of networks) {
+      try {
+        const balance = await clients[net.key as keyof typeof clients].getBalance({ address: address as `0x${string}` });
+        const { price, change } = priceMap[net.key as keyof typeof priceMap];
+        const { action, confidence, note } = getRecommendation(change);
+        recs.push({
+          symbol: net.label.toUpperCase(),
+          action,
+          price,
+          change,
+          confidence,
+          note: `${note} (Balance: ${formatEther(balance)} ETH)`
+        });
+      } catch (e) {
+        // skip network if error
+      }
+    }
+    return recs;
+  },
+});
+
 export const tools = {
      displayBalance: balanceTool,
      multiNetworkBalance: multiNetworkBalanceTool,
@@ -417,4 +475,5 @@ export const tools = {
      depositForBurn: depositForBurnTool,
      getAttestation: getAttestationTool,
      receiveMessage: receiveMessageTool,
+     aiRecommendation: aiRecommendationTool,
 };

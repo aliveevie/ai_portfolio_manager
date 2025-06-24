@@ -3,15 +3,9 @@
 import { ConnectButton } from "@/components/ConnectButton";
 import { Chat } from "@/components/Chat";
 import { useAccount } from "wagmi";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChatWidget } from "@/components/ChatWidget";
 import { usePortfolio } from "@/lib/hooks/usePortfolio";
-
-const mockRecommendations = [
-  { symbol: "NVDA", action: "Strong Buy", price: 875.3, change: 2.4, confidence: 92, note: "AI chip demand surge expected" },
-  { symbol: "META", action: "Consider Sell", price: 485.2, change: -1.2, confidence: 78, note: "Regulatory concerns increasing" },
-  { symbol: "AAPL", action: "Hold", price: 180.45, change: 0.8, confidence: 85, note: "Stable performance expected" },
-];
 
 const mockAllocation = [
   { label: "Tech Stocks", value: 45, color: "#22d3ee" },
@@ -42,9 +36,35 @@ const mockNews = [
 ];
 
 export const Dashboard = () => {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const [tab, setTab] = useState("1D");
   const { portfolioData, loading, error } = usePortfolio();
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
+  const [recError, setRecError] = useState<string | null>(null);
+
+  // Fetch AI recommendations when address changes
+  useEffect(() => {
+    if (!address) {
+      setRecommendations([]);
+      return;
+    }
+    setRecLoading(true);
+    setRecError(null);
+    fetch("/api/ai-recommendations?address=" + address)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch recommendations");
+        return res.json();
+      })
+      .then((data) => {
+        setRecommendations(data);
+        setRecLoading(false);
+      })
+      .catch((err) => {
+        setRecError(err.message || "Unknown error");
+        setRecLoading(false);
+      });
+  }, [address]);
 
   // Calculate real allocation based on actual balances
   const calculateRealAllocation = () => {
@@ -172,22 +192,35 @@ export const Dashboard = () => {
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col gap-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold">AI Recommendations</h2>
-            <span className="text-xs text-gray-400">Updated 2m ago</span>
+            <span className="text-xs text-gray-400">{recLoading ? "Loading..." : "Updated just now"}</span>
           </div>
-          {mockRecommendations.map((rec) => (
-            <div key={rec.symbol} className="bg-[#1a2233] rounded-lg p-4 mb-2">
-              <div className="flex items-center justify-between">
-                <div className="font-bold text-lg">{rec.symbol} <span className={`ml-2 text-xs px-2 py-1 rounded ${rec.action === "Strong Buy" ? "bg-green-900 text-green-300" : rec.action === "Hold" ? "bg-yellow-900 text-yellow-300" : "bg-red-900 text-red-300"}`}>{rec.action}</span></div>
-                <div className="text-right">
-                  <div className="font-bold text-xl">${rec.price.toFixed(2)}</div>
-                  <div className={`text-sm ${rec.change >= 0 ? "text-green-400" : "text-red-400"}`}>{rec.change >= 0 ? "+" : ""}{rec.change}%</div>
-                </div>
-              </div>
-              <div className="mt-2 text-xs text-gray-400">AI Confidence <span className="font-bold text-white ml-1">{rec.confidence}%</span></div>
-              <div className="w-full bg-gray-700 h-2 rounded mt-1 mb-2"><div className="h-2 rounded" style={{ width: `${rec.confidence}%`, background: rec.action === "Strong Buy" ? "#22d3ee" : rec.action === "Hold" ? "#fbbf24" : "#f87171" }}></div></div>
-              <div className="text-xs text-gray-300">{rec.note}</div>
+          {!isConnected ? (
+            <div className="text-gray-400 mt-2">Please connect your wallet to view recommendations</div>
+          ) : recLoading ? (
+            <div className="flex items-center gap-2 mt-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+              <span className="text-gray-400">Loading recommendations...</span>
             </div>
-          ))}
+          ) : recError ? (
+            <div className="text-red-400 mt-2">Error: {recError}</div>
+          ) : recommendations.length === 0 ? (
+            <div className="text-gray-400 mt-2">No recommendations available</div>
+          ) : (
+            recommendations.map((rec) => (
+              <div key={rec.symbol} className="bg-[#1a2233] rounded-lg p-4 mb-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-lg">{rec.symbol} <span className={`ml-2 text-xs px-2 py-1 rounded ${rec.action === "Strong Buy" ? "bg-green-900 text-green-300" : rec.action === "Hold" ? "bg-yellow-900 text-yellow-300" : "bg-red-900 text-red-300"}`}>{rec.action}</span></div>
+                  <div className="text-right">
+                    <div className="font-bold text-xl">${rec.price.toFixed(2)}</div>
+                    <div className={`text-sm ${rec.change >= 0 ? "text-green-400" : "text-red-400"}`}>{rec.change >= 0 ? "+" : ""}{rec.change}%</div>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-400">AI Confidence <span className="font-bold text-white ml-1">{rec.confidence}%</span></div>
+                <div className="w-full bg-gray-700 h-2 rounded mt-1 mb-2"><div className="h-2 rounded" style={{ width: `${rec.confidence}%`, background: rec.action === "Strong Buy" ? "#22d3ee" : rec.action === "Hold" ? "#fbbf24" : "#f87171" }}></div></div>
+                <div className="text-xs text-gray-300">{rec.note}</div>
+              </div>
+            ))
+          )}
         </section>
       </div>
       {/* Performance & Allocation */}
