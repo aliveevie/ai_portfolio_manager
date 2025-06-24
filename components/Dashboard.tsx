@@ -285,8 +285,8 @@ export const Dashboard = () => {
         </section>
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#22d3ee" strokeWidth="2"/></svg> Asset Allocation</h2>
-          <div className="h-48 flex items-center justify-center">
-            <ResponsiveContainer width={180} height={180}>
+          <div className="h-56 flex flex-col items-center justify-center">
+            <ResponsiveContainer width={200} height={200}>
               <PieChart>
                 <Pie
                   data={realAllocation}
@@ -294,29 +294,37 @@ export const Dashboard = () => {
                   nameKey="label"
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+                  innerRadius={60}
+                  outerRadius={85}
+                  paddingAngle={6}
                   isAnimationActive={false}
                 >
                   {realAllocation.map((entry, idx) => (
                     <Cell key={`cell-${entry.label}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ background: '#232b3b', border: 'none', color: '#fff' }} formatter={(v, n, p) => [`${v}%`, p?.payload?.label]} />
-                <Legend />
+                <Tooltip 
+                  contentStyle={{ background: '#232b3b', border: 'none', color: '#fff', fontSize: 14 }} 
+                  formatter={(v, n, p) => [`${v}%`, p?.payload?.label]} 
+                />
               </PieChart>
             </ResponsiveContainer>
+            {/* Center label */}
+            <div className="absolute flex flex-col items-center justify-center" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -60%)', pointerEvents: 'none' }}>
+              <span className="text-lg font-bold text-white">Total Allocation</span>
+              <span className="text-2xl font-bold text-blue-300">{realAllocation.reduce((sum, a) => sum + a.value, 0).toFixed(1)}%</span>
+            </div>
           </div>
-          <ul className="mt-6 space-y-2">
+          {/* Horizontal legend below chart */}
+          <div className="flex flex-wrap justify-center gap-4 mt-4">
             {realAllocation.map((a) => (
-              <li key={a.label} className="flex items-center gap-2 text-sm">
+              <div key={a.label} className="flex items-center gap-2 text-sm">
                 <span className="inline-block w-3 h-3 rounded-full" style={{ background: a.color }}></span>
-                {a.label} <span className="ml-auto font-bold">{a.value.toFixed(1)}%</span>
-              </li>
+                <span className="text-gray-200">{a.label}</span>
+                <span className="font-bold text-white">{a.value.toFixed(1)}%</span>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
       </div>
       {/* Risk, Trades, News */}
