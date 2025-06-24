@@ -8,34 +8,6 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { usePortfolio } from "@/lib/hooks/usePortfolio";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 
-const mockAllocation = [
-  { label: "Tech Stocks", value: 45, color: "#22d3ee" },
-  { label: "Blue Chips", value: 25, color: "#818cf8" },
-  { label: "Crypto", value: 15, color: "#a78bfa" },
-  { label: "Bonds", value: 10, color: "#fbbf24" },
-  { label: "Cash", value: 5, color: "#a3a3a3" },
-];
-
-const mockRisk = [
-  { label: "Portfolio Beta", value: 1.23, desc: "vs S&P 500" },
-  { label: "Sharpe Ratio", value: 1.87, desc: "Risk-adjusted return" },
-  { label: "Max Drawdown", value: "12.4%", desc: "Worst decline" },
-];
-
-const mockTrades = [
-  { type: "BUY", symbol: "AAPL", amount: 9022.5, shares: 50, price: 180.45, time: "2 hours ago" },
-  { type: "SELL", symbol: "TSLA", amount: 6145, shares: 25, price: 245.8, time: "5 hours ago" },
-  { type: "BUY", symbol: "MSFT", amount: 11346, shares: 30, price: 378.2, time: "1 day ago" },
-  { type: "SELL", symbol: "GOOGL", amount: 2139.75, shares: 15, price: 142.65, time: "2 days ago" },
-];
-
-const mockNews = [
-  { title: "Fed Signals Potential Rate Cut", source: "Financial Times", time: "1 hour ago", sentiment: "positive" },
-  { title: "Tech Earnings Beat Expectations", source: "Bloomberg", time: "3 hours ago", sentiment: "positive" },
-  { title: "Oil Prices Surge on Supply Concerns", source: "Reuters", time: "6 hours ago", sentiment: "neutral" },
-  { title: "Crypto Market Shows Volatility", source: "CoinDesk", time: "12 hours ago", sentiment: "negative" },
-];
-
 export const Dashboard = () => {
   const { isConnected, address } = useAccount();
   const [tab, setTab] = useState("1D");
@@ -69,18 +41,15 @@ export const Dashboard = () => {
 
   // Calculate real allocation based on actual balances
   const calculateRealAllocation = () => {
-    if (!portfolioData) return mockAllocation;
-    
+    if (!portfolioData) return [];
     const totalValue = portfolioData.total;
-    if (totalValue === 0) return mockAllocation;
-    
+    if (totalValue === 0) return [];
     const allocation: { label: string; value: number; color: string; }[] = [];
     Object.keys(portfolioData.balances).forEach(network => {
       const balance = portfolioData.balances[network];
       const price = portfolioData.prices[network] || 0;
       const value = balance * price;
       const percentage = (value / totalValue) * 100;
-      
       if (percentage > 0) {
         allocation.push({
           label: network.charAt(0).toUpperCase() + network.slice(1),
@@ -89,8 +58,7 @@ export const Dashboard = () => {
         });
       }
     });
-    
-    return allocation.length > 0 ? allocation : mockAllocation;
+    return allocation;
   };
 
   const getNetworkColor = (network: string) => {
@@ -331,43 +299,51 @@ export const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col gap-4">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 0v10l6 4" stroke="#fbbf24" strokeWidth="2"/></svg> Risk Analysis</h2>
-          {mockRisk.map((r) => (
-            <div key={r.label} className="bg-[#1a2233] rounded-lg p-4 flex flex-col gap-1">
-              <div className="font-bold text-lg">{r.value}</div>
-              <div className="text-xs text-gray-400">{r.label}</div>
-              <div className="text-xs text-gray-500">{r.desc}</div>
+          <div className="flex flex-col gap-2">
+            <div className="bg-[#1a2233] rounded-lg p-4 text-center mb-2">
+              <div className="text-gray-300 text-sm mb-1">BTC Realized Price (Short-Term Holders)</div>
+              <div className="text-2xl font-bold text-blue-300">$98,200</div>
             </div>
-          ))}
-          <div className="bg-blue-950 rounded-lg p-3 mt-2 text-xs text-blue-200">
-            <b>AI Risk Assessment</b><br />Your portfolio shows moderate risk with good diversification. Consider reducing exposure to high-beta stocks for better stability.
+            <div className="bg-[#1a2233] rounded-lg p-4 text-center">
+              <div className="text-gray-300 text-sm mb-1">ETH Realized Price (Short-Term Holders)</div>
+              <div className="text-2xl font-bold text-purple-300">$3,200</div>
+            </div>
           </div>
         </section>
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col gap-4">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="#22d3ee" strokeWidth="2"/></svg> Recent Trades</h2>
-          {mockTrades.map((t, i) => (
-            <div key={i} className="bg-[#1a2233] rounded-lg p-4 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className={`font-bold ${t.type === "BUY" ? "text-green-400" : "text-red-400"}`}>{t.type} {t.symbol}</span>
-                <span className="text-xs text-gray-400">{t.shares} shares @ ${t.price}</span>
+          <div className="flex flex-col gap-2">
+            <div className="bg-[#1a2233] rounded-lg p-4 text-xs text-gray-200">
+              <div className="font-bold text-base mb-2">BTC/USDT Recent Trades (WhiteBIT)</div>
+              <div className="grid grid-cols-3 gap-2 mb-1 text-gray-400">
+                <span>Price</span><span>Amount</span><span>Type</span>
               </div>
-              <div className="text-right">
-                <div className="font-bold">${t.amount.toLocaleString()}</div>
-                <div className="text-xs text-gray-400">{t.time}</div>
+              <div className="grid grid-cols-3 gap-2 mb-1">
+                <span className="text-green-400">$101,000</span><span>0.25</span><span>Buy</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-1">
+                <span className="text-red-400">$100,950</span><span>0.10</span><span>Sell</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-1">
+                <span className="text-green-400">$101,020</span><span>0.05</span><span>Buy</span>
               </div>
             </div>
-          ))}
-          <button className="mt-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded px-4 py-2 text-xs">View All Trades</button>
+          </div>
+          <button className="mt-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded px-4 py-2 text-xs" disabled>View All Trades</button>
         </section>
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col gap-4">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="#22d3ee" strokeWidth="2"/></svg> Market News</h2>
-          {mockNews.map((n, i) => (
-            <div key={i} className="bg-[#1a2233] rounded-lg p-4 flex flex-col gap-1">
-              <div className="font-bold text-sm">{n.title}</div>
-              <div className="text-xs text-gray-400">{n.source} • {n.time}</div>
-              <div className={`text-xs font-bold ${n.sentiment === "positive" ? "text-green-400" : n.sentiment === "negative" ? "text-red-400" : "text-yellow-400"}`}>{n.sentiment}</div>
+          <div className="flex flex-col gap-2">
+            <div className="bg-[#1a2233] rounded-lg p-4 text-gray-200">
+              <div className="font-bold text-base mb-4">Latest Crypto Headlines</div>
+              <div className="flex flex-col gap-4">
+                <a href="https://www.coindesk.com/markets/2025/06/23/bitcoin-bounces-after-war-driven-dip-usd98-2k-emerges-as-key-level-to-maintain-bullish-momentum" target="_blank" rel="noopener noreferrer" className="block text-lg font-semibold text-blue-100 hover:text-blue-300 transition-colors rounded-lg px-4 py-3 bg-[#232b3b] hover:bg-[#334155] shadow-md no-underline">BTC Bounces After War-Driven Dip, Eyes $98.2K as Key Bull Market Line</a>
+                <a href="https://www.coindesk.com/markets/2025/06/03/atom-surges-5-before-forming-bearish-head-and-shoulders-pattern" target="_blank" rel="noopener noreferrer" className="block text-lg font-semibold text-blue-100 hover:text-blue-300 transition-colors rounded-lg px-4 py-3 bg-[#232b3b] hover:bg-[#334155] shadow-md no-underline">ATOM Surges 5% Before Forming Bearish Head-and-Shoulders Pattern</a>
+                <a href="https://www.coindesk.com/markets/2025/05/30/ftx-repayments-may-have-positive-market-impact-coinbase" target="_blank" rel="noopener noreferrer" className="block text-lg font-semibold text-blue-100 hover:text-blue-300 transition-colors rounded-lg px-4 py-3 bg-[#232b3b] hover:bg-[#334155] shadow-md no-underline">FTX Repayments May Have Positive Market Impact This Time: Coinbase Analysts</a>
+              </div>
             </div>
-          ))}
-          <button className="mt-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded px-4 py-2 text-xs">View More News</button>
+          </div>
+          <button className="mt-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded px-4 py-2 text-xs" disabled>View More News</button>
         </section>
       </div>
       <ChatWidget />
