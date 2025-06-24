@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "ai/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,17 @@ import { MessageCircle, Send, X, Bot, User, Copy, Check } from 'lucide-react';
 import { keccak256, decodeEventLog, parseEther, toHex, formatEther } from "viem";
 import { toast } from 'react-hot-toast';
 import React from 'react';
+import { getMessageBytesFromEventLogs, getMessageHashFromBytes } from "@/lib/cctp/utils";
+import { pollForAttestation } from "@/lib/cctp/attestation";
 
 const MESSAGE_TRANSMITTER_ABI = [{"inputs":[{"internalType":"uint32","name":"_localDomain","type":"uint32"},{"internalType":"address","name":"_attester","type":"address"},{"internalType":"uint32","name":"_maxMessageBodySize","type":"uint32"},{"internalType":"uint32","name":"_version","type":"uint32"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterDisabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterEnabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousAttesterManager","type":"address"},{"indexed":true,"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"AttesterManagerUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"MaxMessageBodySizeUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"caller","type":"address"},{"indexed":false,"internalType":"uint32","name":"sourceDomain","type":"uint32"},{"indexed":true,"internalType":"uint64","name":"nonce","type":"uint64"},{"indexed":false,"internalType":"bytes32","name":"sender","type":"bytes32"},{"indexed":false,"internalType":"bytes","name":"messageBody","type":"bytes"}],"name":"MessageReceived","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"message","type":"bytes"}],"name":"MessageSent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[],"name":"Pause","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newAddress","type":"address"}],"name":"PauserChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newRescuer","type":"address"}],"name":"RescuerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"oldSignatureThreshold","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"SignatureThresholdUpdated","type":"event"},{"anonymous":false,"inputs":[],"name":"Unpause","type":"event"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"attesterManager","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"disableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"enableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint32","name":"","type":"uint32"}],"name":"getEnabledAttester","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getEnabledAttesters","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getLocalDomain","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxMessageBodySize","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"nextAvailableNonce","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pauser","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes","name":"_message","type":"bytes"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"receiveMessage","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rescuer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"setAttesterManager","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"setMaxMessageBodySize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_pauser","type":"address"}],"name":"setPauser","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newRescuer","type":"address"}],"name":"setRescuer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"setSignatureThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"signatureThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"version","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"}] as const;
+
+const ETHERSCAN_BASE = {
+  sepolia: 'https://sepolia.etherscan.io/tx/',
+  lineaSepolia: 'https://sepolia.lineascan.build/tx/',
+  arbitrumSepolia: 'https://sepolia.arbiscan.io/tx/',
+  optimismSepolia: 'https://sepolia-optimistic.etherscan.io/tx/',
+};
 
 function formatTime(dateInput: string | Date) {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
@@ -97,6 +106,13 @@ const TransactionCard = ({ txData }: { txData: any }) => {
   );
 };
 
+function asHexString(hash: string | undefined): `0x${string}` | undefined {
+  if (typeof hash === 'string' && /^0x[a-fA-F0-9]{64}$/.test(hash)) {
+    return hash as `0x${string}`;
+  }
+  return undefined;
+}
+
 export const ChatWidget = () => {
   const [open, setOpen] = useState(false);
   const [pendingTx, setPendingTx] = useState<{ hash: `0x${string}`; toolName: string } | null>(null);
@@ -119,75 +135,275 @@ export const ChatWidget = () => {
     hash: pendingTx?.hash,
   });
 
-  useEffect(() => {
-    if (receipt && pendingTx) {
-      if (pendingTx.toolName === 'depositForBurn') {
-        const messageSentLog = receipt.logs.find(
-          (log: any) => log.topics[0] === keccak256(toHex('MessageSent(bytes)'))
-        );
+  // Professional CCTP flow state
+  const [cctpFlow, setCctpFlow] = useState<{
+    step: 'idle' | 'approve' | 'burn' | 'attestation' | 'mint' | 'done';
+    sourceChain?: string;
+    destinationChain?: string;
+    amount?: string;
+    recipientAddress?: string;
+    walletAddress?: string;
+    messageHash?: string;
+    messageBytes?: string;
+    attestation?: string;
+    txHashes?: { [step: string]: string };
+    error?: string;
+    approveTxData?: any;
+    burnTxData?: any;
+    mintTxData?: any;
+  }>({ step: 'idle', txHashes: {} });
 
-        if (messageSentLog) {
-          const decodedLog = decodeEventLog({
-            abi: MESSAGE_TRANSMITTER_ABI,
-            data: messageSentLog.data,
-            topics: messageSentLog.topics,
-          });
+  // Helper to start the CCTP flow
+  const startCCTPFlow = useCallback((params: {
+    sourceChain: string;
+    destinationChain: string;
+    amount: string;
+    recipientAddress: string;
+    walletAddress: string;
+  }) => {
+    setCctpFlow({ step: 'approve', ...params, txHashes: {} });
+  }, []);
 
-          const message = (decodedLog.args as any).message;
-          const messageHash = keccak256(message);
-
-          append({
-            role: 'user',
-            content: `The burn transaction was successful (message hash: ${truncate(messageHash)}). Please get the attestation and then use it to mint the tokens on the destination chain.`,
-          });
-          
-          toast.success("Burn successful! Fetching attestation and preparing to mint...");
-        } else {
-          toast.error("Could not find MessageSent event in the transaction logs.");
-        }
-      } else if (pendingTx.toolName === 'receiveMessage') {
-        toast.success(`Minting transaction confirmed! Your USDC should now be available.`);
-        append({
-            role: 'user',
-            content: `The minting transaction was successful. Please check my token balances now to confirm the transfer.`,
-        });
-      } else if (pendingTx.toolName === 'approveUSDC') {
-        toast.success(`Approval transaction successful!`);
-        append({
-            role: 'user',
-            content: `The approval was successful. Now, please proceed with burning the tokens.`,
-        });
-      } else {
-        toast.success(`Transaction ${pendingTx.hash.slice(0, 10)}... confirmed!`);
-      }
-      setPendingTx(null);
+  // Helper: parse transfer intent from user prompt
+  function parseTransferIntent(prompt: string) {
+    // Example: "transfer 10 usdc from sepolia to arbitrumSepolia to 0x123..."
+    const regex = /transfer\s+(\d+(?:\.\d+)?)\s*usdc\s+from\s+(\w+)\s+to\s+(\w+)\s+to\s+(0x[a-fA-F0-9]{40})/i;
+    const match = prompt.match(regex);
+    if (match) {
+      return {
+        amount: match[1],
+        sourceChain: match[2],
+        destinationChain: match[3],
+        recipientAddress: match[4],
+      };
     }
-  }, [receipt, pendingTx, append]);
+    return null;
+  }
 
+  // Intercept chat submission
+  const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    const transfer = parseTransferIntent(input.trim());
+    if (transfer && address) {
+      append({ role: 'user', content: input });
+      append({ role: 'assistant', content: `Initiating USDC transfer of ${transfer.amount} from ${transfer.sourceChain} to ${transfer.destinationChain} for recipient ${transfer.recipientAddress}...` });
+      startCCTPFlow({
+        ...transfer,
+        walletAddress: address,
+      });
+    } else {
+      // fallback to normal chat
+      handleSubmit(e);
+    }
+  };
+
+  // Show CCTP progress in chat
+  useEffect(() => {
+    if (cctpFlow.step === 'approve') {
+      append({ role: 'assistant', content: 'Step 1: Approving USDC for transfer...' });
+    } else if (cctpFlow.step === 'burn') {
+      append({ role: 'assistant', content: 'Step 2: Burning USDC on source chain...' });
+    } else if (cctpFlow.step === 'attestation') {
+      append({ role: 'assistant', content: 'Step 3: Waiting for attestation...' });
+    } else if (cctpFlow.step === 'mint') {
+      append({ role: 'assistant', content: 'Step 4: Minting USDC on destination chain...' });
+    } else if (cctpFlow.step === 'done') {
+      append({ role: 'assistant', content: '✅ USDC transfer complete! Check your wallet on the destination chain.' });
+    }
+    if (cctpFlow.error) {
+      append({ role: 'assistant', content: `❌ Error: ${cctpFlow.error}` });
+    }
+  }, [cctpFlow.step, cctpFlow.error]);
+
+  // Add useEffect for burn -> attestation
+  useEffect(() => {
+    if (cctpFlow.step === 'burn' && receipt && receipt.logs) {
+      try {
+        const topic = 'MessageSent(bytes)';
+        if (!topic) {
+          setCctpFlow((prev) => ({ ...prev, error: 'Missing event topic for message extraction.' }));
+          return;
+        }
+        const messageBytes = getMessageBytesFromEventLogs(receipt.logs, topic);
+        const messageHash = getMessageHashFromBytes(messageBytes);
+        setCctpFlow((prev) => ({
+          ...prev,
+          step: 'attestation',
+          messageBytes,
+          messageHash,
+        }));
+      } catch (err: any) {
+        setCctpFlow((prev) => ({ ...prev, error: err?.message || 'Failed to extract message bytes' }));
+      }
+    }
+  }, [cctpFlow.step, receipt]);
+
+  // Add useEffect for attestation -> mint
+  useEffect(() => {
+    const fetchAttestation = async () => {
+      if (cctpFlow.step === 'attestation' && cctpFlow.messageHash) {
+        try {
+          const attestationResult = await pollForAttestation(cctpFlow.messageHash);
+          if (attestationResult && typeof attestationResult.message === 'string') {
+            setCctpFlow((prev) => ({
+              ...prev,
+              step: 'mint',
+              attestation: attestationResult.message || undefined,
+            }));
+            append({ role: 'assistant', content: 'Attestation received. Please sign the mint transaction.' });
+          } else {
+            setCctpFlow((prev) => ({ ...prev, error: 'Attestation not found' }));
+          }
+        } catch (err: any) {
+          setCctpFlow((prev) => ({ ...prev, error: err?.message || 'Attestation polling failed' }));
+        }
+      }
+    };
+    fetchAttestation();
+    // Only run when step or messageHash changes
+  }, [cctpFlow.step, cctpFlow.messageHash]);
+
+  // Add useEffect for mint -> done
+  useEffect(() => {
+    const doMint = async () => {
+      if (cctpFlow.step === 'mint' && cctpFlow.attestation && cctpFlow.messageBytes && cctpFlow.destinationChain && cctpFlow.walletAddress) {
+        try {
+          // Call backend to get mint transaction data
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+          const res = await fetch(`${baseUrl}/api/circle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'receiveMessage',
+              destinationChain: cctpFlow.destinationChain,
+              messageBytes: cctpFlow.messageBytes,
+              attestation: cctpFlow.attestation,
+              walletAddress: cctpFlow.walletAddress,
+            }),
+          });
+          const data = await res.json();
+          if (data.success && data.transactionData) {
+            // Prompt user to sign mint transaction
+            // You may want to show a button or auto-sign here
+            // For now, just set the transaction data in cctpFlow
+            setCctpFlow((prev) => ({
+              ...prev,
+              mintTxData: data.transactionData,
+            }));
+          } else {
+            setCctpFlow((prev) => ({ ...prev, error: data.error || 'Failed to prepare mint transaction' }));
+          }
+        } catch (err: any) {
+          setCctpFlow((prev) => ({ ...prev, error: err?.message || 'Mint step failed' }));
+        }
+      }
+    };
+    doMint();
+  }, [cctpFlow.step, cctpFlow.attestation, cctpFlow.messageBytes, cctpFlow.destinationChain, cctpFlow.walletAddress]);
+
+  // Add a useEffect to handle the guided CCTP flow
+  useEffect(() => {
+    // Step 1: After approval is signed and confirmed, prompt for burn
+    if (cctpFlow.step === 'approve' && cctpFlow.approveTxData && cctpFlow.txHashes?.approve) {
+      // Wait for approval receipt
+      const approveHash = asHexString(cctpFlow.txHashes?.approve);
+      if (approveHash) {
+        const { data: approveReceipt } = useWaitForTransactionReceipt({ hash: approveHash });
+        if (approveReceipt && approveReceipt.status === 'success') {
+          append({ role: 'assistant', content: 'Approval confirmed. Please sign the burn transaction.' });
+          setCctpFlow((prev) => ({ ...prev, step: 'burn' }));
+        }
+      }
+    }
+    // Step 2: After burn is signed and confirmed, extract message bytes, get attestation, and prompt for mint
+    if (cctpFlow.step === 'burn' && cctpFlow.burnTxData && cctpFlow.txHashes?.burn) {
+      const burnHash = asHexString(cctpFlow.txHashes?.burn);
+      if (burnHash) {
+        const { data: burnReceipt } = useWaitForTransactionReceipt({ hash: burnHash });
+        if (burnReceipt && burnReceipt.status === 'success') {
+          try {
+            const topic = 'MessageSent(bytes)';
+            if (!topic) {
+              setCctpFlow((prev) => ({ ...prev, error: 'Missing event topic for message extraction.' }));
+              return;
+            }
+            const messageBytes = getMessageBytesFromEventLogs(burnReceipt.logs, topic);
+            const messageHash = getMessageHashFromBytes(messageBytes);
+            setCctpFlow((prev) => ({ ...prev, messageBytes, messageHash, step: 'attestation' }));
+            append({ role: 'assistant', content: 'Burn confirmed. Fetching attestation...' });
+          } catch (err: any) {
+            setCctpFlow((prev) => ({ ...prev, error: err?.message || 'Failed to extract message bytes' }));
+          }
+        }
+      }
+    }
+    // Step 3: After attestation is received, prompt for mint
+    if (cctpFlow.step === 'attestation' && cctpFlow.messageHash) {
+      (async () => {
+        try {
+          const attestationResult = await pollForAttestation(cctpFlow.messageHash);
+          if (attestationResult && typeof attestationResult.message === 'string') {
+            setCctpFlow((prev) => ({ ...prev, attestation: attestationResult.message || undefined, step: 'mint' }));
+            append({ role: 'assistant', content: 'Attestation received. Please sign the mint transaction.' });
+          } else {
+            setCctpFlow((prev) => ({ ...prev, error: 'Attestation not found' }));
+          }
+        } catch (err: any) {
+          setCctpFlow((prev) => ({ ...prev, error: err?.message || 'Attestation polling failed' }));
+        }
+      })();
+    }
+    // Step 4: After mint is signed and confirmed, show final hash and success
+    if (cctpFlow.step === 'mint' && cctpFlow.mintTxData && cctpFlow.txHashes?.mint) {
+      const mintHash = asHexString(cctpFlow.txHashes?.mint);
+      if (mintHash) {
+        const { data: mintReceipt } = useWaitForTransactionReceipt({ hash: mintHash });
+        if (mintReceipt && mintReceipt.status === 'success') {
+          setCctpFlow((prev) => ({ ...prev, step: 'done' }));
+          append({ role: 'assistant', content: `✅ USDC transfer complete! Final transaction hash: ${cctpFlow.txHashes.mint}` });
+        }
+      }
+    }
+  }, [cctpFlow, append]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSignTransaction = (toolName: string, transactionData: any) => {
-    sendTransaction({
-      to: transactionData.to,
-      data: transactionData.data,
-      value: BigInt(transactionData.value)
-    }, {
-      onSuccess: (hash) => {
-        toast.loading(`Transaction sent: ${hash.slice(0, 10)}... Waiting for confirmation.`);
-        if (toolName === 'depositForBurn' || toolName === 'receiveMessage' || toolName === 'approveUSDC') {
-          setPendingTx({ hash, toolName });
-        } else {
-          toast.success(`Transaction confirmed: ${hash.slice(0, 10)}...`);
-        }
-      },
-      onError: (error) => {
-        toast.error(`Transaction failed: ${error.message}`);
+  const handleSignTransaction = async (toolName: string, transactionData: any) => {
+    try {
+      if (!transactionData || !transactionData.to) {
+        toast.error('Invalid transaction data.');
+        return;
       }
-    });
+      const tx = await sendTransaction({
+        to: transactionData.to,
+        data: transactionData.data,
+        value: transactionData.value ? BigInt(transactionData.value) : BigInt(0),
+      });
+      const hexTxHash = asHexString(transactionData.hash);
+      if (hexTxHash) {
+        setPendingTx({ hash: hexTxHash, toolName });
+        setCctpFlow((prev) => {
+          const txHashes = { ...prev.txHashes };
+          if (toolName === 'approve') txHashes.approve = hexTxHash;
+          if (toolName === 'burn') txHashes.burn = hexTxHash;
+          if (toolName === 'mint') txHashes.mint = hexTxHash;
+          return {
+            ...prev,
+            txHashes,
+            [`${toolName}TxData`]: transactionData,
+          };
+        });
+        toast.success('Transaction sent!');
+      } else {
+        toast.error('Failed to get valid transaction hash from transactionData.');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Transaction failed.');
+    }
   };
 
   return (
@@ -323,12 +539,12 @@ export const ChatWidget = () => {
           </div>
 
           {/* Input */}
-          <form className="p-4 border-t border-gray-700" onSubmit={handleSubmit}>
+          <form className="p-4 border-t border-gray-700" onSubmit={handleChatSubmit}>
             <div className="flex space-x-2">
               <Input
                 value={input}
                 onChange={handleInputChange}
-                placeholder="Ask about your portfolio..."
+                placeholder="Ask about your portfolio or transfer USDC..."
                 className="flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 autoFocus
                 disabled={!isConnected}

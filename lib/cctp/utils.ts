@@ -1,4 +1,4 @@
-import { keccak256, defaultAbiCoder } from "viem";
+import { keccak256, decodeAbiParameters } from "viem";
 import type { Log } from "viem";
 
 /**
@@ -25,7 +25,7 @@ export function getMessageBytesFromEventLogs(
   if (!log) {
     throw new Error("MessageSent event not found in logs");
   }
-  return defaultAbiCoder.decode(["bytes"], log.data)[0] as `0x${string}`;
+  return decodeAbiParameters([{ type: "bytes" }], log.data)[0] as `0x${string}`;
 }
 
 /**
