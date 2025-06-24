@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { useState, useEffect } from "react";
 import { ChatWidget } from "@/components/ChatWidget";
 import { usePortfolio } from "@/lib/hooks/usePortfolio";
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 
 const mockAllocation = [
   { label: "Tech Stocks", value: 45, color: "#22d3ee" },
@@ -103,6 +104,39 @@ export const Dashboard = () => {
   };
 
   const realAllocation = calculateRealAllocation();
+
+  // Simulate historical data for the performance chart
+  const generatePerformanceData = () => {
+    if (!portfolioData) return [];
+    const now = new Date();
+    let points = 0;
+    let interval = 1; // in hours
+    switch (tab) {
+      case '1D': points = 24; interval = 1; break;
+      case '1W': points = 7; interval = 24; break;
+      case '1M': points = 30; interval = 24; break;
+      case '3M': points = 12; interval = 7 * 24; break;
+      case '1Y': points = 12; interval = 30 * 24; break;
+      case 'ALL': points = 24; interval = 30 * 24; break;
+      default: points = 24; interval = 1;
+    }
+    // Simulate a random walk for demo, starting from invested up to total
+    const start = portfolioData.invested;
+    const end = portfolioData.total;
+    const data = [];
+    for (let i = 0; i < points; i++) {
+      const t = i / (points - 1);
+      // Linear interpolation + some noise
+      const value = start + (end - start) * t + (Math.random() - 0.5) * (end - start) * 0.03;
+      const date = new Date(now.getTime() - (points - 1 - i) * interval * 60 * 60 * 1000);
+      data.push({
+        date: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        value: Math.max(0, value),
+      });
+    }
+    return data;
+  };
+  const performanceData = generatePerformanceData();
 
   return (
     <div className="min-h-screen bg-[#181f2a] text-white p-6 sm:p-10 font-sans">
@@ -232,40 +266,48 @@ export const Dashboard = () => {
               <button key={t} onClick={() => setTab(t)} className={`px-3 py-1 rounded ${tab === t ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300"}`}>{t}</button>
             ))}
           </div>
-          <div className="h-56 flex items-center justify-center text-gray-400">[Mock Line Chart Here]</div>
+          <div className="h-56">
+            {loading || !portfolioData ? (
+              <div className="flex items-center justify-center h-full text-gray-400">Loading chart...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={performanceData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} domain={[dataMin => Math.floor(dataMin * 0.98), dataMax => Math.ceil(dataMax * 1.02)]} />
+                  <Tooltip contentStyle={{ background: '#232b3b', border: 'none', color: '#fff' }} formatter={(v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+                  <Legend />
+                  <Line type="monotone" dataKey="value" stroke="#22d3ee" strokeWidth={2} dot={false} name="Portfolio Value" />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </section>
         <section className="bg-[#232b3b] rounded-xl p-6 shadow flex flex-col">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#22d3ee" strokeWidth="2"/></svg> Asset Allocation</h2>
           <div className="h-48 flex items-center justify-center">
-            {/* Real Donut Chart */}
-            <div className="relative w-36 h-36">
-              <svg viewBox="0 0 36 36" className="w-full h-full">
-                {(() => {
-                  let acc = 0;
-                  return realAllocation.map((a, i) => {
-                    const val = (a.value / 100) * 100;
-                    const dash = val * 1.13;
-                    const gap = 113 - dash;
-                    const offset = acc;
-                    acc += dash;
-                    return (
-                      <circle
-                        key={a.label}
-                        cx="18" cy="18" r="18"
-                        fill="transparent"
-                        stroke={a.color}
-                        strokeWidth="6"
-                        strokeDasharray={`${dash} ${gap}`}
-                        strokeDashoffset={-offset}
-                      />
-                    );
-                  });
-                })()}
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center text-xl font-bold">
-                {realAllocation.reduce((sum, a) => sum + a.value, 0).toFixed(1)}%
-              </div>
-            </div>
+            <ResponsiveContainer width={180} height={180}>
+              <PieChart>
+                <Pie
+                  data={realAllocation}
+                  dataKey="value"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+                  isAnimationActive={false}
+                >
+                  {realAllocation.map((entry, idx) => (
+                    <Cell key={`cell-${entry.label}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ background: '#232b3b', border: 'none', color: '#fff' }} formatter={(v, n, p) => [`${v}%`, p?.payload?.label]} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
           <ul className="mt-6 space-y-2">
             {realAllocation.map((a) => (
