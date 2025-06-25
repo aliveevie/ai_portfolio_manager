@@ -7,6 +7,20 @@ import { useState, useEffect } from "react";
 import { ChatWidget } from "@/components/ChatWidget";
 import { usePortfolio } from "@/lib/hooks/usePortfolio";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
+import dynamic from 'next/dynamic';
+import { LiFiWidget, WidgetConfig } from '@lifi/widget';
+
+// Dynamically import LiFiWidget for SSR safety
+
+// Define the widget config for professional appearance
+const widgetConfig: WidgetConfig = {
+  theme: {
+    container: {
+      border: '1px solid rgb(234, 234, 234)',
+      borderRadius: '16px',
+    },
+  },
+};
 
 export const Dashboard = () => {
   const { isConnected, address } = useAccount();
@@ -15,6 +29,8 @@ export const Dashboard = () => {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [recLoading, setRecLoading] = useState(false);
   const [recError, setRecError] = useState<string | null>(null);
+  // Add widget modal state
+  const [showLifiWidget, setShowLifiWidget] = useState(false);
 
   // Fetch AI recommendations when address changes
   useEffect(() => {
@@ -108,6 +124,30 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#181f2a] text-white p-6 sm:p-10 font-sans">
+      {/* Li.Fi Widget Button at the top */}
+      <div className="flex justify-end mb-4">
+        <button
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold"
+          onClick={() => setShowLifiWidget(true)}
+        >
+          Open Li.Fi Widget
+        </button>
+      </div>
+      {/* Widget Modal */}
+      {showLifiWidget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="bg-white rounded-lg shadow-lg p-4 relative w-[400px] max-w-full">
+            <button
+              className="absolute top-2 right-2 text-gray-600 hover:text-gray-900"
+              onClick={() => setShowLifiWidget(false)}
+            >
+              ✕
+            </button>
+            {/* Official Li.Fi Widget integration */}
+            <LiFiWidget integrator="AI Portfolio Manager" config={widgetConfig} />
+          </div>
+        </div>
+      )}
       <header className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-green-300 flex items-center gap-2">
           <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
