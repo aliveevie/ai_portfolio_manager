@@ -13,6 +13,7 @@
     "@circle-fin/developer-controlled-wallets": "^8.3.0",
     "@circle-fin/smart-contract-platform": "^8.3.0",
     "@circle-fin/user-controlled-wallets": "^8.3.0",
+    "@lifi/sdk": "^3.7.9",
     "@radix-ui/react-slot": "^1.1.1",
     "@tanstack/react-query": "^5.62.7",
     "ai": "^4.0.18",

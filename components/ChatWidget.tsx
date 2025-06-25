@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 import React from 'react';
 import { getMessageBytesFromEventLogs, getMessageHashFromBytes } from "@/lib/cctp/utils";
 import { pollForAttestation } from "@/lib/cctp/attestation";
+import { tools } from '@/ai/tools';
 
 const MESSAGE_TRANSMITTER_ABI = [{"inputs":[{"internalType":"uint32","name":"_localDomain","type":"uint32"},{"internalType":"address","name":"_attester","type":"address"},{"internalType":"uint32","name":"_maxMessageBodySize","type":"uint32"},{"internalType":"uint32","name":"_version","type":"uint32"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterDisabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"attester","type":"address"}],"name":"AttesterEnabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousAttesterManager","type":"address"},{"indexed":true,"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"AttesterManagerUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"MaxMessageBodySizeUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"caller","type":"address"},{"indexed":false,"internalType":"uint32","name":"sourceDomain","type":"uint32"},{"indexed":true,"internalType":"uint64","name":"nonce","type":"uint64"},{"indexed":false,"internalType":"bytes32","name":"sender","type":"bytes32"},{"indexed":false,"internalType":"bytes","name":"messageBody","type":"bytes"}],"name":"MessageReceived","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"message","type":"bytes"}],"name":"MessageSent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[],"name":"Pause","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newAddress","type":"address"}],"name":"PauserChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"newRescuer","type":"address"}],"name":"RescuerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"oldSignatureThreshold","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"SignatureThresholdUpdated","type":"event"},{"anonymous":false,"inputs":[],"name":"Unpause","type":"event"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"attesterManager","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"disableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"attester","type":"address"}],"name":"enableAttester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint32","name":"","type":"uint32"}],"name":"getEnabledAttester","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getEnabledAttesters","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getLocalDomain","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxMessageBodySize","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"nextAvailableNonce","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pauser","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes","name":"_message","type":"bytes"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"receiveMessage","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rescuer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newAttesterManager","type":"address"}],"name":"setAttesterManager","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newMaxMessageBodySize","type":"uint256"}],"name":"setMaxMessageBodySize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_pauser","type":"address"}],"name":"setPauser","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newRescuer","type":"address"}],"name":"setRescuer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"newSignatureThreshold","type":"uint256"}],"name":"setSignatureThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"signatureThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"version","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"}] as const;
 
@@ -113,6 +114,21 @@ function asHexString(hash: string | undefined): `0x${string}` | undefined {
   return undefined;
 }
 
+function parseSwapIntent(prompt: string) {
+  // Example: "swap 1 usdc from sepolia to arbitrumSepolia"
+  const regex = /swap\s+(\d+(?:\.\d+)?)\s+(\w+)\s+from\s+(\w+)\s+to\s+(\w+)/i;
+  const match = prompt.match(regex);
+  if (match) {
+    return {
+      amount: match[1],
+      tokenSymbol: match[2],
+      fromChain: match[3],
+      toChain: match[4],
+    };
+  }
+  return null;
+}
+
 export const ChatWidget = () => {
   const [open, setOpen] = useState(false);
   const [pendingTx, setPendingTx] = useState<{ hash: `0x${string}`; toolName: string } | null>(null);
@@ -180,22 +196,84 @@ export const ChatWidget = () => {
     return null;
   }
 
+  // Add swap state:
+  const [swapFlow, setSwapFlow] = useState<{
+    step: 'idle' | 'quote' | 'approve' | 'done';
+    fromChain?: string;
+    toChain?: string;
+    fromToken?: string;
+    toToken?: string;
+    amount?: string;
+    fromAddress?: string;
+    quote?: any;
+    error?: string;
+    txData?: any;
+    txHash?: string;
+  }>({ step: 'idle' });
+
   // Intercept chat submission
   const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return;
-    const transfer = parseTransferIntent(input.trim());
-    if (transfer && address) {
+    const swap = parseSwapIntent(input.trim());
+    if (swap && address) {
       append({ role: 'user', content: input });
-      append({ role: 'assistant', content: `Initiating USDC transfer of ${transfer.amount} from ${transfer.sourceChain} to ${transfer.destinationChain} for recipient ${transfer.recipientAddress}...` });
-      startCCTPFlow({
-        ...transfer,
-        walletAddress: address,
-      });
-    } else {
-      // fallback to normal chat
-      handleSubmit(e);
+      append({ role: 'assistant', content: `Fetching swap quote for ${swap.amount} ${swap.tokenSymbol} from ${swap.fromChain} to ${swap.toChain}...` });
+      // Remove KNOWN_TOKENS/__zod_schema usage and use a type-safe tokenMap
+      const tokenMap: Record<string, Record<string, string>> = {
+        sepolia: {
+          USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+        },
+        lineaSepolia: {
+          USDC: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff',
+        },
+        arbitrumSepolia: {
+          USDC: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+        },
+        optimismSepolia: {
+          USDC: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7',
+        },
+      };
+      const fromToken = tokenMap[swap.fromChain]?.[swap.tokenSymbol.toUpperCase()];
+      const toToken = tokenMap[swap.toChain]?.[swap.tokenSymbol.toUpperCase()];
+      if (!fromToken || !toToken) {
+        append({ role: 'assistant', content: `❌ Token not supported on selected chains.` });
+        return;
+      }
+      // Convert amount to smallest units (assume 6 decimals for USDC)
+      const fromAmount = (BigInt(Math.floor(parseFloat(swap.amount) * 1e6))).toString();
+      try {
+        const quote = await tools.lifiSwap.execute({
+          fromChain: swap.fromChain,
+          toChain: swap.toChain,
+          fromToken,
+          toToken,
+          fromAmount,
+          fromAddress: address,
+        });
+        if (typeof quote === 'object' && 'error' in quote && quote.error) {
+          append({ role: 'assistant', content: `❌ Swap quote error: ${quote.error}` });
+          return;
+        }
+        setSwapFlow({
+          step: 'quote',
+          fromChain: swap.fromChain,
+          toChain: swap.toChain,
+          fromToken,
+          toToken,
+          amount: swap.amount,
+          fromAddress: address,
+          quote,
+        });
+        const estimate = (typeof quote === 'object' && 'estimate' in quote) ? quote.estimate : undefined;
+        append({ role: 'assistant', content: `Swap quote found! Estimated output: ${estimate?.toAmountMin || estimate?.toAmount || '?'} ${swap.tokenSymbol} on ${swap.toChain}.\n\nDo you want to proceed? Type 'yes' to approve and sign the transaction.` });
+      } catch (err: any) {
+        append({ role: 'assistant', content: `❌ Failed to fetch swap quote: ${err?.message}` });
+      }
+      return;
     }
+    // fallback to normal chat
+    handleSubmit(e);
   };
 
   // Show CCTP progress in chat
@@ -366,6 +444,44 @@ export const ChatWidget = () => {
       }
     }
   }, [cctpFlow, append]);
+
+  // Add effect to listen for user confirmation to proceed with swap
+  useEffect(() => {
+    if (swapFlow.step === 'quote' && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === 'user' && lastMsg.content.trim().toLowerCase() === 'yes') {
+        // Prepare transaction data for signing
+        const txData = swapFlow.quote?.transactionRequest;
+        if (!txData) {
+          append({ role: 'assistant', content: '❌ No transaction data available for this swap.' });
+          return;
+        }
+        setSwapFlow((prev) => ({ ...prev, step: 'approve', txData }));
+        append({ role: 'assistant', content: 'Please sign the swap transaction in your wallet.' });
+      }
+    }
+  }, [swapFlow, messages]);
+
+  // Add effect to send transaction when in approve step
+  useEffect(() => {
+    if (swapFlow.step === 'approve' && swapFlow.txData) {
+      (async () => {
+        try {
+          // Use wagmi's sendTransaction hook, which is already set up
+          sendTransaction({
+            to: swapFlow.txData.to,
+            data: swapFlow.txData.data,
+            value: swapFlow.txData.value ? BigInt(swapFlow.txData.value) : BigInt(0),
+          });
+          setSwapFlow((prev) => ({ ...prev, step: 'done', txHash: undefined }));
+          append({ role: 'assistant', content: `✅ Swap transaction sent! Please check your wallet for confirmation.` });
+        } catch (err: any) {
+          setSwapFlow((prev) => ({ ...prev, error: err?.message || 'Swap transaction failed' }));
+          append({ role: 'assistant', content: `❌ Swap transaction failed: ${err?.message}` });
+        }
+      })();
+    }
+  }, [swapFlow.step, swapFlow.txData]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

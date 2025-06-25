@@ -4,6 +4,7 @@ import { publicClient } from "@/wagmi.config";
 import { formatEther, formatUnits, getAddress } from "viem";
 import { createPublicClient, http } from "viem";
 import { lineaSepolia, sepolia, arbitrumSepolia, optimismSepolia } from "wagmi/chains";
+import { createConfig as createLifiConfig, getQuote as lifiGetQuote, ChainId } from '@lifi/sdk';
 
 // Create public clients for each network
 const lineaSepoliaClient = createPublicClient({
@@ -466,6 +467,52 @@ const aiRecommendationTool = createTool({
   },
 });
 
+// --- Li.Fi Swap Tool ---
+
+// Configure Li.Fi SDK once
+createLifiConfig({ integrator: 'AI portfolio manager' });
+
+// Mapping from internal chain names to Li.Fi ChainId
+const LIFI_CHAIN_IDS: Record<string, number> = {
+  sepolia: 11155111,
+  lineaSepolia: 59141,
+  arbitrumSepolia: 421614,
+  optimismSepolia: 11155420,
+  // Add more as needed
+};
+
+const lifiSwapTool = createTool({
+  description: 'Get a cross-chain or on-chain swap quote using Li.Fi. Returns the best route and transaction data for execution.',
+  parameters: z.object({
+    fromChain: z.string().describe('Source chain name, e.g., sepolia, lineaSepolia, arbitrumSepolia, optimismSepolia'),
+    toChain: z.string().describe('Destination chain name'),
+    fromToken: z.string().describe('Source token address'),
+    toToken: z.string().describe('Destination token address'),
+    fromAmount: z.string().describe('Amount to swap, in smallest units (wei or token decimals)'),
+    fromAddress: z.string().describe('User wallet address (sender)'),
+  }),
+  execute: async ({ fromChain, toChain, fromToken, toToken, fromAmount, fromAddress }) => {
+    try {
+      const fromChainId = LIFI_CHAIN_IDS[fromChain];
+      const toChainId = LIFI_CHAIN_IDS[toChain];
+      if (!fromChainId || !toChainId) {
+        return { error: `Unsupported chain. Supported: ${Object.keys(LIFI_CHAIN_IDS).join(', ')}` };
+      }
+      const quote = await lifiGetQuote({
+        fromChain: fromChainId,
+        toChain: toChainId,
+        fromToken,
+        toToken,
+        fromAmount,
+        fromAddress,
+      });
+      return quote;
+    } catch (error: any) {
+      return { error: error?.message || 'Failed to fetch Li.Fi quote' };
+    }
+  },
+});
+
 export const tools = {
      displayBalance: balanceTool,
      multiNetworkBalance: multiNetworkBalanceTool,
@@ -476,4 +523,5 @@ export const tools = {
      getAttestation: getAttestationTool,
      receiveMessage: receiveMessageTool,
      aiRecommendation: aiRecommendationTool,
+     lifiSwap: lifiSwapTool,
 };
